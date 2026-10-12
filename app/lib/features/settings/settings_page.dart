@@ -142,9 +142,16 @@ class _BridgeCheckState extends ConsumerState<_BridgeCheck> {
       final page = pb.ping();
       final worker = await pb.workerPing();
       final content = await pb.normalizeContent('{"profile":{"name":"Test"}}');
+      final spec = await pb.defaultSpec('developer');
+      final state =
+          '{"content":$content,"spec":$spec,"custom":{"css":"","js":"","sections":{}},'
+          '"contactForm":{"service":"none","value":""}}';
+      final site = await pb.render(state, '{"mode":"export"}');
       setState(
         () => _result =
-            'Page: $page · Worker: $worker · Schema: ${content.contains('"projects":[]') ? 'ok' : 'unexpected'}',
+            'Page: $page · Worker: $worker · '
+            'Schema: ${content.contains('"projects":[]') ? 'ok' : 'unexpected'} · '
+            'Renderer: ${site.contains('pb-hero--terminal') ? 'ok' : 'unexpected'}',
       );
     } catch (e) {
       setState(() => _result = 'Not working: $e');

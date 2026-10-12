@@ -20,3 +20,4 @@ app/.flutter-plugins-dependencies
 app/web/js/
 .idea/
 .vscode/
+.gallery/

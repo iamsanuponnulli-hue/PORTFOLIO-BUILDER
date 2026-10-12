@@ -5,3 +5,4 @@ docs/
 **/generated/
 pnpm-lock.yaml
 PLAN.md
+**/.gallery/

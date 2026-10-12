@@ -1,0 +1,26 @@
+{
+  "name": "@pb/renderer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Turns portfolio content + design spec into a static HTML/CSS/JS site. Pure and deterministic.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./samples": "./src/samples.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run test",
+    "test:browser": "node --experimental-strip-types test-browser/run.ts",
+    "gallery": "node --experimental-strip-types scripts/dev-gallery.ts"
+  },
+  "dependencies": {
+    "@pb/schema": "workspace:*"
+  },
+  "devDependencies": {
+    "axe-core": "^4.14.0",
+    "playwright": "1.56.1"
+  }
+}

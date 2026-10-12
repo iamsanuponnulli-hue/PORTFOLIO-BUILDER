@@ -15,4 +15,16 @@ class _UnavailableBridge implements PbBridge {
   @override
   Future<String> normalizeContent(String json) =>
       Future.error(const PbUnavailable());
+  @override
+  Future<String> defaultSpec(String profileType, [String? presetId]) =>
+      Future.error(const PbUnavailable());
+  @override
+  Future<String> applyOperations(String stateJson, String opsJson) =>
+      Future.error(const PbUnavailable());
+  @override
+  Future<String> render(String stateJson, String optionsJson) =>
+      Future.error(const PbUnavailable());
+  @override
+  String previewDocument(String filesJson, [String page = 'index.html']) =>
+      throw const PbUnavailable();
 }

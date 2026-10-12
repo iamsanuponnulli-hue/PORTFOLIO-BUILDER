@@ -32,6 +32,25 @@ describe('worker rpc', () => {
     expect(c.projects).toEqual([]);
   });
 
+  it('renders a site from a default design in the worker', async () => {
+    const [page, worker] = pair();
+    serve(worker, workerHandlers);
+    const call = client(page);
+    const spec = await call('defaultSpec', 'student');
+    const state = {
+      content: await call('normalizeContent', { profile: { name: 'Priya' } }),
+      spec,
+      custom: { css: '', js: '', sections: {} },
+      contactForm: { service: 'none', value: '' },
+    };
+    const next = await call<typeof state>('applyOperations', state, [
+      { op: 'setVariant', id: 'hero', variant: 'bigtype' },
+    ]);
+    const out = await call<{ files: Record<string, string> }>('render', next, { mode: 'export' });
+    expect(out.files['index.html']).toContain('pb-hero--bigtype');
+    await expect(call('applyOperations', state, [{ op: 'deleteEverything' }])).rejects.toThrow();
+  });
+
   it('turns handler errors into rejected promises', async () => {
     const [page, worker] = pair();
     serve(worker, workerHandlers);

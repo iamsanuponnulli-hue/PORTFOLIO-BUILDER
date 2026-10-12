@@ -74,6 +74,15 @@ describe('operations', () => {
   });
 });
 
+describe('patch operations', () => {
+  it('only carry the fields being changed', () => {
+    const op = Operation.parse({ op: 'setSeo', seo: { title: 'x' } });
+    expect(op).toEqual({ op: 'setSeo', seo: { title: 'x' } });
+    const cf = Operation.parse({ op: 'setContactForm', contactForm: { value: 'f/1' } });
+    expect(cf).toEqual({ op: 'setContactForm', contactForm: { value: 'f/1' } });
+  });
+});
+
 describe('relay request', () => {
   it('requires at least one message', () => {
     expect(

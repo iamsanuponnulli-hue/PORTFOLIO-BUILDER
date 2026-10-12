@@ -10,6 +10,7 @@ export default tseslint.config(
       'app/**',
       '**/generated/**',
       'docs/**',
+      '**/.gallery/**',
     ],
   },
   js.configs.recommended,

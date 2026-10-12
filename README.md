@@ -7,9 +7,15 @@ HTML/CSS/JS as a ZIP.
 - **Plan:** [`PLAN.md`](PLAN.md)
 - **Architecture, screens and control flows:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 
-**Status:** Phase 0 (foundations) is done. Sign-in, the dashboard, data rules, the
-server functions and the browser-package bridge work. The setup wizard, renderer,
-editor and AI features come in Phases 1–5.
+**Status:** Phases 0 and 1 are done.
+
+- Phase 0: sign-in, the dashboard, data rules, the server functions and the
+  browser-package bridge.
+- Phase 1: the site renderer — 12 section types with 2–4 layouts each, 6 theme
+  presets, default designs for the 4 profile types, case-study pages, contact forms,
+  SEO tags, instant checks, and the edit operations every change goes through.
+
+The setup wizard, editor and AI features come in Phases 2–5.
 
 ## How it's built
 
@@ -19,6 +25,7 @@ stored data (behind security rules), the Starter AI relay and account cleanup.
 ```
 app/                Flutter Web app (Riverpod, go_router, Firebase)
 packages/schema     Shared data definitions (zod) → JSON Schema → Dart models
+packages/renderer   Content + design spec → static HTML/CSS/JS site (pure, deterministic)
 packages/bridge     Browser bundle exposed to Flutter as window.pb, plus a Web Worker
 functions/          Cloud Functions: aiRelay (Starter AI only), onUserDeleted
 firebase/           Firestore and Storage security rules, with emulator tests
@@ -65,6 +72,8 @@ pnpm lint              # eslint + prettier
 pnpm typecheck
 pnpm test              # unit tests: schema, bridge, relay
 pnpm test:emulator     # security rules + Starter quota against the emulators (needs Java)
+pnpm --filter @pb/renderer test:browser   # every layout × theme in Chromium: overflow + axe
+pnpm --filter @pb/renderer gallery        # writes sample sites to packages/renderer/.gallery
 pnpm codegen           # regenerate Dart models after changing packages/schema
 
 cd app
@@ -78,7 +87,8 @@ CI runs all of these on every pull request (`.github/workflows/ci.yml`).
 
 1. Edit the zod schemas in `packages/schema/src`.
 2. Run `pnpm codegen`. This regenerates `app/lib/models/generated/models.dart` and the
-   default-value templates in `app/assets/schema/templates.json`.
+   default-value templates in `app/assets/schema/templates.json`. Don't hand-edit or `dart format` the
+   generated file; CI checks it matches the generator output exactly.
 3. Update `firebase/firestore.rules` if a stored document's shape changed, and add a
    rules test in `firebase/test`.
 

@@ -10,7 +10,8 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@pb/schema": "workspace:*"
+    "@pb/schema": "workspace:*",
+    "@pb/renderer": "workspace:*"
   },
   "devDependencies": {
     "esbuild": "^0.28.2"
