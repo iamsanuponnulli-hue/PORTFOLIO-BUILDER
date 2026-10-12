@@ -1,0 +1,27 @@
+{
+  "name": "@pb/ai",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Client-side AI gateway: the user's own key, any provider, validated structured output.",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@ai-sdk/anthropic": "^4.0.78",
+    "@ai-sdk/google": "^4.0.93",
+    "@ai-sdk/groq": "^4.0.59",
+    "@ai-sdk/mistral": "^4.0.62",
+    "@ai-sdk/openai": "^4.0.91",
+    "@ai-sdk/openai-compatible": "^3.0.67",
+    "@pb/schema": "workspace:*",
+    "ai": "^7.0.137",
+    "zod": "^4.6.6"
+  }
+}
