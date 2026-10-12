@@ -10,6 +10,10 @@
 > - **Sign-in required** (Firebase Auth: Google, GitHub, email + verification)
 > - **Bring your own API key + model picker**, plus a small free starter allowance (§4.5)
 > - **Contact forms link to an external form service** the user already uses (§3.8)
+> - **Full MVP scope** (Phases 0–6, ~13.5 weeks for one developer)
+> - **4 profile types at launch**: Developer, Designer, Student/New grad, General professional
+> - **No payments in MVP** — free Starter allowance + bring your own key
+> - **English app UI**; site content in any left-to-right language
 
 ---
 
@@ -78,14 +82,20 @@ Why this matters:
 ## 3. Features (portfolio-specific)
 
 ### 3.1 Intake (fast path first)
-1. **Choose your profile type** — Developer, Designer, Product/PM, Data/ML, Writer,
-   Photographer/Artist, Academic/Researcher, Student/New grad, Freelancer/Consultant,
-   Other. Sets default sections, tone, and import suggestions.
+1. **Choose your profile type** — MVP ships 4, each with its own default sections,
+   section variants, tone, and import suggestions:
+   | Type | Default sections | Emphasis |
+   |---|---|---|
+   | Developer | hero, about, projects, experience, skills, writing, contact | GitHub import, tech stack, terminal-style hero option |
+   | Designer | hero, selected work (gallery/case studies), about, experience, testimonials, contact | Large visuals, case-study pages |
+   | Student / New grad | hero, about, education, projects, skills, experience/internships, awards, contact | Education first, coursework & clubs |
+   | General professional | hero, about, experience, highlights/skills, testimonials, contact | Achievements, clear CTA to contact |
+   Product/PM, Data/ML, Writer, Photographer/Artist, Academic, Freelancer come after
+   launch (§3.10); the section library already covers most of what they need.
 2. **Import** (each optional):
    - Resume upload (PDF/DOCX) → structured content.
    - LinkedIn: guide the user to download their LinkedIn profile as PDF, parsed like a resume.
    - GitHub username → pinned/top repos, languages, stars, README summaries → project cards.
-   - ORCID ID (academics) → publications.
    - Blog RSS / Medium / dev.to feed → writing section.
 3. **Review content** — editable forms pre-filled from imports, with a
    *missing-content checklist* ("Add a photo", "Projects have no images",
@@ -178,6 +188,12 @@ write meta description).
   resume.pdf  robots.txt  sitemap.xml
   README.md                     (how to deploy to GitHub Pages / Netlify / any host)
   ```
+- Fonts are **self-hosted inside the ZIP** (WOFF2), not loaded from Google's servers —
+  faster and avoids EU privacy issues. Icons are inline SVG from an open-licensed set
+  (e.g. Lucide).
+- All paths are relative, so the site also works by opening `index.html` locally.
+- Exported sites target the last 2 versions of Chrome, Edge, Firefox and Safari
+  (desktop + mobile); no frameworks, no build step, no tracking.
 
 ### 3.8 Contact form via external form service
 Static sites can't send email themselves, so the contact section links to a form
@@ -199,12 +215,28 @@ service the user signs up for (all have free plans):
   Formspree") so testing doesn't spam the user.
 - Portfolio score flags a form with no endpoint configured.
 
-### 3.9 Later (post-MVP)
+### 3.9 Projects & everyday basics
+- Dashboard: create, rename, duplicate, delete projects; thumbnail of each site.
+  Limit **5 projects per user** in MVP.
+- **Autosave** of content/spec edits (debounced); explicit "Save version" for named checkpoints.
+- Same project open in two tabs: version check on save, "newer changes exist — reload?"
+  (last write never silently overwrites).
+- Re-importing a resume later **merges**: new items are proposed, never overwrite edited ones.
+- Undo/redo inside the editor session; version restore across sessions.
+- Onboarding: short first-run tour of the editor; empty states that explain each panel.
+- Resume parse failure (e.g. a scanned image-only PDF): retry with a vision-capable model
+  if available, otherwise fall back to manual entry with a clear message.
+
+### 3.10 Later (post-MVP)
 - **Job-tailored variants**: paste a job description → a variant of the site that
   reorders projects and highlights matching skills, sharing the same content.
 - One-click hosting/publishing and custom domains.
 - Analytics snippet setup, contact form hosting.
 - Template marketplace, team/agency mode.
+- More profile types (Product/PM, Data/ML, Writer, Photographer/Artist, Academic with
+  ORCID import, Freelancer with services/pricing).
+- Paid plans (Stripe): bigger AI allowance, more projects.
+- Translated app UI and right-to-left site support.
 
 ---
 
@@ -354,7 +386,7 @@ BYO key instead, where each user gets their own quota. The app includes a step-b
 └───────────────┬───────────────────────────────────────────────────────────────┘
                 │ HTTPS + Firebase ID token; SSE for streamed progress
 ┌───────────────▼─────────────── API service (Cloud Run, TypeScript, Fastify) ──┐
-│ projects · imports (resume, GitHub, ORCID, RSS) · ai tasks · assets · export   │
+│ projects · imports (resume, GitHub, RSS) · ai tasks · assets · export          │
 │ LLM gateway → Anthropic / OpenAI / Google / OpenAI-compatible                  │
 └───────┬───────────────────────────────┬───────────────────────────────────────┘
         │                               │
@@ -491,10 +523,35 @@ SiteSpec {
 - Inspiration is for style only; prompts forbid copying third-party text, images, or
   logos, and captured screenshots are never included in exports.
 - Per-user rate limits and AI usage quotas; usage logged per task and model.
+- **Legal & privacy pages** before launch: privacy policy, terms of use, and an
+  AI-processing notice naming which provider receives the user's data (differs for
+  Starter vs BYO key; free provider tiers may train on data).
+- **Data rights**: export all my data (JSON + assets ZIP), delete account; resumes can
+  be deleted after parsing ("keep original file" toggle, default on).
+- Prompt-injection hygiene: resume text, READMEs and reference pages are treated as
+  data — wrapped and labelled in prompts; outputs are schema-validated operations, so
+  injected instructions can't run arbitrary actions.
 
 ---
 
-## 9. Roadmap
+## 9. Operations
+- **Environments**: `dev` (emulators), `staging`, `prod` — separate Firebase projects.
+- **Hosting of the app itself**: Flutter Web on Firebase Hosting; API and capture
+  service on Cloud Run. A small static marketing/landing page (Flutter Web is poor
+  for SEO).
+- **Monitoring**: Sentry (Flutter + backend), Cloud Logging with structured logs,
+  uptime checks, alerts on error rate and AI spend.
+- **Cost controls**: daily spend cap on the Starter key, budget alerts in Google Cloud,
+  per-user quotas, capture-service concurrency limit.
+- **Product analytics**: privacy-friendly events (signup, first site generated, export,
+  BYO key added) to measure the success metrics in §1.
+- **Admin tools (minimal)**: look up a user, reset Starter quota, disable abusive
+  accounts — protected admin route, not a full back office.
+- **Backups**: scheduled Firestore export; Storage versioning on project files.
+
+---
+
+## 10. Roadmap
 
 | Phase | Deliverable | Est. |
 |---|---|---|
@@ -508,18 +565,49 @@ SiteSpec {
 | **7. Multi-model hardening** | Cross-model eval runs (incl. free-tier models), prompt tuning per tier, recommended-model labels, usage dashboard | 1 wk |
 
 **MVP = Phases 0–6 (~13.5 weeks for one developer).** Phase 7 can run in parallel once
-Phase 5 lands. Later items are listed in §3.9.
+Phase 5 lands. Later items are listed in §3.10.
 
 **First milestone worth demoing:** end of Phase 2 — upload a resume, get a rendered
 portfolio from the library with a default theme, no design AI yet.
 
 ---
 
-## 10. Decisions log & remaining questions
-**Decided:** ZIP export · plain HTML/CSS/JS · TypeScript backend · model-agnostic AI ·
-BYO key + model picker · sign-in required · contact forms via external form service.
+## 11. Decisions log & remaining questions
+**Decided:** ZIP export · plain HTML/CSS/JS · TypeScript backend · Flutter Web ·
+model-agnostic AI · BYO key + model picker · free Starter allowance · sign-in required ·
+contact forms via external form service · full MVP scope (Phases 0–6) · 4 profile types ·
+no payments · English UI with any LTR content language.
 
-**Still open (can be decided during Phase 2):**
+**Still open (decide during Phase 2, not blocking):**
 1. Starter allowance size and which low-cost model backs it.
 2. Which free-tier providers to feature in the "get a free key" guide (verify their
    current limits and data-use terms at that time).
+
+---
+
+## 12. Assumptions (change any of these if they're wrong)
+**Product**
+- Desktop-first editor (laptop/desktop browsers). On phones the app supports sign-in,
+  intake and preview, but not the code editor or drag-and-drop editing.
+- One person edits a project at a time (no real-time collaboration).
+- Single-page sites by default, plus optional project case-study pages.
+- Limits per user: 5 projects; resume ≤ 10 MB; images ≤ 15 MB; 3 inspiration links per project.
+- The user owns everything they export; exports carry no "made with" badge or tracking.
+- Portfolio content is the user's own; the AI never invents facts.
+
+**Technical**
+- Firebase (Auth, Firestore, Storage, Hosting) on Google Cloud, with Cloud Run for the
+  API and capture service.
+- Vercel AI SDK behind our own gateway interface for multi-provider support.
+- Monaco as the code editor inside Flutter Web; the renderer is a shared TypeScript
+  package run in both the browser and the server.
+- Fonts and icons are bundled into the ZIP; no third-party requests from exported sites
+  except the user's chosen form service.
+- App supports the last 2 versions of Chrome, Edge, Firefox and Safari.
+
+**Business & team**
+- One full-time developer (estimates scale down with more people; Phases 1 and 2 can
+  run in parallel with two).
+- You pay the Starter AI cost (small; capped daily) and Google Cloud hosting.
+- Privacy policy and terms are written before public launch (templates + review).
+- Launch region is global; GDPR-style data export/delete is built in from day one.
