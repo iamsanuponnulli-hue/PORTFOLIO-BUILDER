@@ -23,6 +23,15 @@ export function configurePdfJs(loader: () => Promise<PdfJs>): void {
   pdfjsLoader = loader;
 }
 
+/** In the browser: load pdf.js on first use and run its worker from `workerSrc`. */
+export function usePdfWorker(workerSrc: string): void {
+  pdfjsLoader = async () => {
+    const pdfjs = await import('pdfjs-dist');
+    pdfjs.GlobalWorkerOptions.workerSrc = workerSrc;
+    return pdfjs;
+  };
+}
+
 export function detectKind(name: string, mediaType: string): ResumeText['kind'] | undefined {
   if (mediaType === 'application/pdf' || /\.pdf$/i.test(name)) return 'pdf';
   if (
@@ -87,7 +96,10 @@ export async function extractResumeText(
       data.byteOffset + data.byteLength,
     ) as ArrayBuffer;
     // Browsers read `arrayBuffer`; Node (tests) reads `buffer`.
-    const { value } = await mammoth.extractRawText({ arrayBuffer: buffer, buffer: data });
+    const input = { arrayBuffer: buffer, buffer: data } as unknown as Parameters<
+      typeof mammoth.extractRawText
+    >[0];
+    const { value } = await mammoth.extractRawText(input);
     return { text: value.replace(/\n{3,}/g, '\n\n').trim(), pages: 1, scanned: false, kind };
   }
   const { text, pages } = await pdfText(data);

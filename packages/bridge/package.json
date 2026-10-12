@@ -5,15 +5,21 @@
   "type": "module",
   "description": "Browser bundle exposed to Flutter as window.pb, plus the background worker.",
   "scripts": {
-    "build": "esbuild src/main.ts --bundle --format=iife --target=es2022 --minify --sourcemap --outfile=../../app/web/js/pb.js && esbuild src/worker.ts --bundle --format=iife --target=es2022 --minify --sourcemap --outfile=../../app/web/js/pb.worker.js",
+    "build": "node scripts/build.mjs",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:browser": "node --experimental-strip-types test-browser/run.ts"
   },
   "dependencies": {
     "@pb/schema": "workspace:*",
-    "@pb/renderer": "workspace:*"
+    "@pb/renderer": "workspace:*",
+    "@pb/ai": "workspace:*",
+    "@pb/imports": "workspace:*",
+    "@pb/localstore": "workspace:*"
   },
   "devDependencies": {
-    "esbuild": "^0.28.2"
+    "esbuild": "^0.28.2",
+    "fake-indexeddb": "^6.2.5",
+    "playwright": "1.56.1"
   }
 }

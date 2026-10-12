@@ -77,6 +77,15 @@ importers:
 
   packages/bridge:
     dependencies:
+      '@pb/ai':
+        specifier: workspace:*
+        version: link:../ai
+      '@pb/imports':
+        specifier: workspace:*
+        version: link:../imports
+      '@pb/localstore':
+        specifier: workspace:*
+        version: link:../localstore
       '@pb/renderer':
         specifier: workspace:*
         version: link:../renderer
@@ -87,6 +96,12 @@ importers:
       esbuild:
         specifier: ^0.28.2
         version: 0.28.2
+      fake-indexeddb:
+        specifier: ^6.2.5
+        version: 6.2.5
+      playwright:
+        specifier: 1.56.1
+        version: 1.56.1
 
   packages/imports:
     dependencies:

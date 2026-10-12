@@ -9,7 +9,19 @@ export interface Port {
 }
 
 type Request = { id: number; method: string; args: unknown[] };
-type Response = { id: number; ok: true; value: unknown } | { id: number; ok: false; error: string };
+type Response =
+  | { id: number; ok: true; value: unknown }
+  | { id: number; ok: false; error: string; code?: string };
+
+/** An error from the worker, keeping the machine-readable code (e.g. 'invalid_key'). */
+export class WorkerError extends Error {
+  constructor(
+    message: string,
+    readonly code?: string,
+  ) {
+    super(message);
+  }
+}
 
 export type Handlers = Record<string, (...args: never[]) => unknown>;
 
@@ -24,7 +36,13 @@ export function serve(port: Port, handlers: Handlers): void {
       port.postMessage({ id, ok: true, value } satisfies Response);
     } catch (err) {
       const error = err instanceof Error ? err.message : String(err);
-      port.postMessage({ id, ok: false, error } satisfies Response);
+      const code = (err as { code?: unknown })?.code;
+      port.postMessage({
+        id,
+        ok: false,
+        error,
+        ...(typeof code === 'string' ? { code } : {}),
+      } satisfies Response);
     }
   });
 }
@@ -39,7 +57,7 @@ export function client(port: Port, timeoutMs = 60_000) {
     if (!p) return;
     pending.delete(res.id);
     if (res.ok) p.resolve(res.value);
-    else p.reject(new Error(res.error));
+    else p.reject(new WorkerError(res.error, res.code));
   });
   return function call<T>(method: string, ...args: unknown[]): Promise<T> {
     const id = next++;

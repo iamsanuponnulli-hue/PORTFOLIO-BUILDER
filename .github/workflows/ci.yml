@@ -60,6 +60,21 @@ jobs:
       - run: pnpm --filter @pb/renderer exec playwright install --with-deps chromium
       - run: pnpm --filter @pb/renderer run test:browser
 
+  bridge-browser:
+    name: Browser bundles in Chromium (keys, PDF, AI via mock provider, images)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm bridge
+      - run: pnpm --filter @pb/bridge exec playwright install --with-deps chromium
+      - run: pnpm --filter @pb/bridge run test:browser
+
   flutter:
     name: Flutter (analyze, test, build web)
     runs-on: ubuntu-latest

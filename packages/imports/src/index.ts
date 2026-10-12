@@ -1,5 +1,6 @@
 export {
   configurePdfJs,
+  usePdfWorker,
   detectKind,
   extractResumeText,
   MAX_RESUME_BYTES,

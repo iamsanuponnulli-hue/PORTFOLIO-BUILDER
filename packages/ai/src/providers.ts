@@ -1,9 +1,3 @@
-import { createAnthropic } from '@ai-sdk/anthropic';
-import { createGoogleGenerativeAI } from '@ai-sdk/google';
-import { createGroq } from '@ai-sdk/groq';
-import { createMistral } from '@ai-sdk/mistral';
-import { createOpenAI } from '@ai-sdk/openai';
-import { createOpenAICompatible } from '@ai-sdk/openai-compatible';
 import type { LanguageModel } from 'ai';
 
 export type ProviderId =
@@ -104,43 +98,60 @@ export interface Credentials {
   baseUrl?: string;
 }
 
-/** Builds an AI SDK model that calls the provider directly from the browser. */
-export function createModel(
+/**
+ * Builds an AI SDK model that calls the provider directly from the browser. Each
+ * provider's library loads only when it is first used.
+ */
+export async function createModel(
   c: Credentials,
   modelId: string,
   fetchImpl?: typeof fetch,
-): LanguageModel {
+): Promise<LanguageModel> {
   const f = fetchImpl ? { fetch: fetchImpl } : {};
   switch (c.provider) {
-    case 'gemini':
+    case 'gemini': {
+      const { createGoogleGenerativeAI } = await import('@ai-sdk/google');
       return createGoogleGenerativeAI({ apiKey: c.apiKey, ...f })(modelId);
-    case 'groq':
+    }
+    case 'groq': {
+      const { createGroq } = await import('@ai-sdk/groq');
       return createGroq({ apiKey: c.apiKey, ...f })(modelId);
-    case 'openrouter':
+    }
+    case 'openrouter': {
+      const { createOpenAICompatible } = await import('@ai-sdk/openai-compatible');
       return createOpenAICompatible({
         name: 'openrouter',
         baseURL: 'https://openrouter.ai/api/v1',
         apiKey: c.apiKey,
         ...f,
       })(modelId);
-    case 'anthropic':
+    }
+    case 'anthropic': {
+      const { createAnthropic } = await import('@ai-sdk/anthropic');
       // Anthropic requires this header for calls made directly from a web page.
       return createAnthropic({
         apiKey: c.apiKey,
         headers: { 'anthropic-dangerous-direct-browser-access': 'true' },
         ...f,
       })(modelId);
-    case 'openai':
+    }
+    case 'openai': {
+      const { createOpenAI } = await import('@ai-sdk/openai');
       return createOpenAI({ apiKey: c.apiKey, ...f })(modelId);
-    case 'mistral':
+    }
+    case 'mistral': {
+      const { createMistral } = await import('@ai-sdk/mistral');
       return createMistral({ apiKey: c.apiKey, ...f })(modelId);
-    case 'custom':
+    }
+    case 'custom': {
       if (!c.baseUrl) throw new Error('A base URL is required for this provider.');
+      const { createOpenAICompatible } = await import('@ai-sdk/openai-compatible');
       return createOpenAICompatible({
         name: 'custom',
         baseURL: c.baseUrl.replace(/\/+$/, ''),
         apiKey: c.apiKey,
         ...f,
       })(modelId);
+    }
   }
 }
