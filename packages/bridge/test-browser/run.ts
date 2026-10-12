@@ -55,24 +55,22 @@ const server = createServer((req, res) => {
     req.on('data', (c) => (body += c));
     req.on('end', () => {
       seen.push(`prompt-has-resume:${body.includes('cut page load time')}`);
-      res
-        .writeHead(200, { ...cors, 'content-type': 'application/json' })
-        .end(
-          JSON.stringify({
-            id: 'x',
-            object: 'chat.completion',
-            created: 0,
-            model: 'mock-large',
-            choices: [
-              {
-                index: 0,
-                message: { role: 'assistant', content: resumeReply },
-                finish_reason: 'stop',
-              },
-            ],
-            usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 },
-          }),
-        );
+      res.writeHead(200, { ...cors, 'content-type': 'application/json' }).end(
+        JSON.stringify({
+          id: 'x',
+          object: 'chat.completion',
+          created: 0,
+          model: 'mock-large',
+          choices: [
+            {
+              index: 0,
+              message: { role: 'assistant', content: resumeReply },
+              finish_reason: 'stop',
+            },
+          ],
+          usage: { prompt_tokens: 100, completion_tokens: 50, total_tokens: 150 },
+        }),
+      );
     });
     return;
   }
