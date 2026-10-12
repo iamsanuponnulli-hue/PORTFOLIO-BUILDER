@@ -1,4 +1,43 @@
-/// What the Dart side can call on window.pb. Grows with each phase.
+import 'dart:convert';
+
+/// Result of a bridge call that can fail: `{"ok":true,"value":…}` or
+/// `{"ok":false,"error":{"code","message"}}` (see packages/bridge/src/main.ts).
+class PbResult {
+  const PbResult.ok(this.value) : errorCode = null, errorMessage = null;
+  const PbResult.error(this.errorCode, this.errorMessage) : value = null;
+
+  final Object? value;
+  final String? errorCode;
+  final String? errorMessage;
+
+  bool get ok => errorCode == null;
+
+  factory PbResult.parse(String json) {
+    final m = jsonDecode(json) as Map<String, dynamic>;
+    if (m['ok'] == true) return PbResult.ok(m['value']);
+    final e = (m['error'] as Map?) ?? const {};
+    return PbResult.error(
+      e['code'] as String? ?? 'error',
+      e['message'] as String? ?? 'Something went wrong.',
+    );
+  }
+
+  /// The value, or throws [PbException] with the friendly message.
+  T get<T>() {
+    if (!ok) throw PbException(errorCode!, errorMessage!);
+    return value as T;
+  }
+}
+
+class PbException implements Exception {
+  const PbException(this.code, this.message);
+  final String code;
+  final String message;
+  @override
+  String toString() => message;
+}
+
+/// What the Dart side can call on window.pb.
 abstract interface class PbBridge {
   bool get available;
   String get version;
@@ -23,6 +62,19 @@ abstract interface class PbBridge {
 
   /// One self-contained HTML document for the sandboxed preview iframe.
   String previewDocument(String filesJson, [String page = 'index.html']);
+
+  /// Switches on-device storage to this user ('' after sign-out).
+  void setUser(String uid);
+
+  /// AI providers with free-tier flags and key guides (JSON array).
+  String providersJson();
+
+  /// Calls `pb.<namespace>.<method>(...args)`, which resolves to a [PbResult] JSON.
+  Future<PbResult> invoke(
+    String namespace,
+    String method, [
+    List<Object?> args = const [],
+  ]);
 }
 
 class PbUnavailable implements Exception {
@@ -30,3 +82,11 @@ class PbUnavailable implements Exception {
   @override
   String toString() => 'The browser packages (pb.js) are not loaded.';
 }
+
+List<Map<String, dynamic>> jsonList(Object? v) =>
+    (v as List? ?? const []).cast<Map<String, dynamic>>();
+
+Map<String, dynamic> jsonMap(Object? v) =>
+    (v as Map?)?.cast<String, dynamic>() ?? const {};
+
+String encode(Object? v) => jsonEncode(v);

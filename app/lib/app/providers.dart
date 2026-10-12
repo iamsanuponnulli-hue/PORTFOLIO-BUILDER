@@ -48,6 +48,14 @@ final authUserProvider = StreamProvider<User?>(
   (ref) => ref.watch(authRepositoryProvider).userChanges(),
 );
 
+/// Points on-device storage (keys, images, drafts) at the signed-in user, so people
+/// sharing a browser never see each other's data. Watch this before using it.
+final deviceUserProvider = Provider<String?>((ref) {
+  final uid = ref.watch(authUserProvider.select((u) => u.value?.uid));
+  ref.read(pbBridgeProvider).setUser(uid ?? '');
+  return uid;
+});
+
 /// Creates users/{uid} on first sign-in, then streams it.
 final userDocProvider = StreamProvider<UserDoc?>((ref) async* {
   final user = ref.watch(authUserProvider).value;

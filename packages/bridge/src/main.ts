@@ -1,5 +1,6 @@
 // The page bundle stays small: heavy code (AI SDK, PDF reader, renderer) lives in the worker.
 import { createPkce, exchangeOpenRouterCode, openRouterAuthUrl } from '@pb/ai/openrouter';
+import { PROVIDERS } from '@pb/ai/providers';
 import { previewDocument } from '@pb/renderer';
 import { LIMITS } from '@pb/schema/limits';
 import { openLocalStore, type FileRecord, type LocalStore } from '@pb/localstore';
@@ -61,8 +62,11 @@ function createBridge(scriptSrc: string) {
     );
     return call<T>(method, ...args);
   };
+  // Each signed-in user gets their own on-device database, so people sharing a
+  // browser never see each other's keys or images.
+  let user = 'signed-out';
   let store: Promise<LocalStore> | undefined;
-  const local = () => (store ??= openLocalStore());
+  const local = () => (store ??= openLocalStore(`portfolio-builder-${user}`));
   const blobUrls = new Map<string, string[]>();
 
   const keys = async (provider: string) => {
@@ -76,6 +80,14 @@ function createBridge(scriptSrc: string) {
 
   return {
     version: '0.2.0',
+    /** Call after sign-in (and with '' after sign-out). */
+    setUser: (uid: string) => {
+      const next = uid || 'signed-out';
+      if (next !== user) {
+        user = next;
+        store = undefined;
+      }
+    },
     limits: LIMITS,
     ping: () => 'pong',
 
@@ -171,6 +183,8 @@ function createBridge(scriptSrc: string) {
     },
 
     ai: {
+      /** Providers with free-tier flags and "get a key" steps (JSON). */
+      providers: () => JSON.stringify(PROVIDERS),
       /** Reads resume text with the user's own key and model. Returns PortfolioContent. */
       parseResume: (provider: string, modelId: string, text: string) =>
         result(async () => workerCall('parseResume', await keys(provider), modelId, text)),

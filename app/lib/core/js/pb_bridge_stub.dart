@@ -27,4 +27,17 @@ class _UnavailableBridge implements PbBridge {
   @override
   String previewDocument(String filesJson, [String page = 'index.html']) =>
       throw const PbUnavailable();
+  @override
+  void setUser(String uid) {}
+  @override
+  String providersJson() => '[]';
+  @override
+  Future<PbResult> invoke(
+    String namespace,
+    String method, [
+    List<Object?> args = const [],
+  ]) async => const PbResult.error(
+    'unavailable',
+    'The browser packages (pb.js) are not loaded.',
+  );
 }

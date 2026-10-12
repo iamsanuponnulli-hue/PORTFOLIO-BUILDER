@@ -3,12 +3,14 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../features/ai/ai_settings_page.dart';
 import '../features/auth/auth_repository.dart';
 import '../features/auth/sign_in_page.dart';
 import '../features/auth/verify_email_page.dart';
 import '../features/dashboard/dashboard_page.dart';
-import '../features/project/project_placeholder_page.dart';
+import '../features/preview/preview_page.dart';
 import '../features/settings/settings_page.dart';
+import '../features/setup/setup_page.dart';
 import 'providers.dart';
 
 enum AuthState { loading, signedOut, needsVerification, signedIn }
@@ -67,9 +69,23 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(path: '/', builder: (_, _) => const DashboardPage()),
       GoRoute(path: '/settings', builder: (_, _) => const SettingsPage()),
       GoRoute(
+        path: '/settings/ai',
+        builder: (_, state) =>
+            AiSettingsPage(openRouterCode: state.uri.queryParameters['code']),
+      ),
+      GoRoute(
         path: '/p/:id',
         builder: (_, state) =>
-            ProjectPlaceholderPage(projectId: state.pathParameters['id']!),
+            PreviewPage(projectId: state.pathParameters['id']!),
+        routes: [
+          GoRoute(
+            path: 'setup',
+            builder: (_, state) => SetupPage(
+              projectId: state.pathParameters['id']!,
+              step: SetupStep.parse(state.uri.queryParameters['step']),
+            ),
+          ),
+        ],
       ),
     ],
   );

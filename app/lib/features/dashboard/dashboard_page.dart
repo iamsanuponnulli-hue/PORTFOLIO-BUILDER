@@ -21,7 +21,7 @@ class DashboardPage extends ConsumerWidget {
       final id = await ref
           .read(projectRepositoryProvider)
           .create(uid: uid, name: result.name, profileType: result.profileType);
-      if (context.mounted) context.go('/p/$id');
+      if (context.mounted) context.go('/p/$id/setup');
     } on ProjectLimitReached catch (e) {
       if (context.mounted) showMessage(context, e.toString());
     } catch (_) {

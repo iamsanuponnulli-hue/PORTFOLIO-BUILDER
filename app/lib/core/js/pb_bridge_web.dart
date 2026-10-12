@@ -1,4 +1,5 @@
 import 'dart:js_interop';
+import 'dart:js_interop_unsafe';
 
 import 'pb_bridge_types.dart';
 
@@ -10,6 +11,12 @@ extension type _PbApi._(JSObject _) implements JSObject {
   external String ping();
   external _PbWorker get worker;
   external String previewDocument(String filesJson, String page);
+  external void setUser(String uid);
+  external _PbAi get ai;
+}
+
+extension type _PbAi._(JSObject _) implements JSObject {
+  external String providers();
 }
 
 extension type _PbWorker._(JSObject _) implements JSObject {
@@ -27,6 +34,14 @@ extension type _PbWorker._(JSObject _) implements JSObject {
 }
 
 PbBridge createPbBridge() => _WebBridge();
+
+JSAny? _toJs(Object? v) => switch (v) {
+  null => null,
+  final String s => s.toJS,
+  final num n => n.toJS,
+  final bool b => b.toJS,
+  _ => throw ArgumentError('Unsupported bridge argument: $v'),
+};
 
 class _WebBridge implements PbBridge {
   _PbApi get _api => _pb ?? (throw const PbUnavailable());
@@ -62,4 +77,31 @@ class _WebBridge implements PbBridge {
   @override
   String previewDocument(String filesJson, [String page = 'index.html']) =>
       _api.previewDocument(filesJson, page);
+
+  @override
+  void setUser(String uid) => _pb?.setUser(uid);
+
+  @override
+  String providersJson() => _pb?.ai.providers() ?? '[]';
+
+  @override
+  Future<PbResult> invoke(
+    String namespace,
+    String method, [
+    List<Object?> args = const [],
+  ]) async {
+    final api = _pb;
+    if (api == null) {
+      return const PbResult.error(
+        'unavailable',
+        'The browser packages are not loaded.',
+      );
+    }
+    final target = api.getProperty<JSObject>(namespace.toJS);
+    final promise = target.callMethodVarArgs<JSPromise<JSString>>(
+      method.toJS,
+      args.map(_toJs).toList(),
+    );
+    return PbResult.parse((await promise.toDart).toDart);
+  }
 }

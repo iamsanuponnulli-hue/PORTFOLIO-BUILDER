@@ -54,13 +54,14 @@ class SettingsPage extends ConsumerWidget {
                     children: [
                       ListTile(
                         leading: const Icon(Icons.auto_awesome_outlined),
-                        title: const Text('Your AI key'),
+                        title: const Text('Your AI key and model'),
                         subtitle: Text(
-                          'This app has no paid AI of its own: AI features use your own key, '
-                          'kept on this device only and never uploaded. Free keys from Gemini, '
-                          'Groq or OpenRouter work. Setting this up arrives in the next phase.',
+                          'Free keys from Gemini, Groq or OpenRouter work. '
+                          'Keys stay on this computer.',
                           style: theme.textTheme.bodySmall,
                         ),
+                        trailing: const Icon(Icons.chevron_right),
+                        onTap: () => context.go('/settings/ai'),
                       ),
                     ],
                   ),

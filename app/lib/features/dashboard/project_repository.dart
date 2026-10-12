@@ -10,6 +10,11 @@ class ProjectEntry {
   final ProjectDoc doc;
 }
 
+/// The cloud copy changed since this device loaded it (e.g. edited in another tab).
+class StaleWrite implements Exception {
+  const StaleWrite();
+}
+
 class ProjectLimitReached implements Exception {
   const ProjectLimitReached(this.limit);
   final int limit;
@@ -111,6 +116,33 @@ class ProjectRepository {
         'revision': entry.doc.revision + 1,
         'updatedAt': _now,
       });
+
+  /// Writes a locally edited project. Security rules require the revision to move
+  /// on by exactly one, so a stale copy can never overwrite newer changes.
+  Future<int> saveWorking(String id, ProjectDoc doc, int baseRevision) async {
+    final revision = baseRevision + 1;
+    final j = doc.toJson();
+    try {
+      await _projects.doc(id).update({
+        for (final k in [
+          'name',
+          'status',
+          'goals',
+          'content',
+          'spec',
+          'custom',
+          'contactForm',
+        ])
+          k: j[k],
+        'revision': revision,
+        'updatedAt': _now,
+      });
+    } on FirebaseException catch (e) {
+      if (e.code == 'permission-denied') throw const StaleWrite();
+      rethrow;
+    }
+    return revision;
+  }
 
   /// Deletes the project, its version history and decrements the counter.
   Future<void> delete({

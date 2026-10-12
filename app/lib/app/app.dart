@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import 'providers.dart';
 import 'router.dart';
 import 'theme.dart';
 
@@ -9,6 +10,7 @@ class PortfolioBuilderApp extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    ref.watch(deviceUserProvider);
     return MaterialApp.router(
       title: 'Portfolio Builder',
       debugShowCheckedModeBanner: false,
