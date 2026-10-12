@@ -1,268 +1,433 @@
-# Portfolio Builder — Implementation Plan
+# Portfolio Builder — Product & Implementation Plan
 
-A Flutter Web app that turns a user's details, resume, and design inspiration into a
-working portfolio website, then lets them refine it in a built-in code editor with a
-live preview and AI prompt-based editing.
-
----
-
-## 1. Product scope
-
-### Stage 1 — Intake (gather everything needed to generate a site)
-1. **User details** — name, headline, bio, location, contact, social links, photo.
-2. **Resume upload** — PDF/DOCX. Parsed by AI into structured data (experience,
-   education, skills, projects, certifications). The user reviews and corrects the
-   extracted fields before generating.
-3. **Requirements** — purpose (job hunting, freelance, academic, creative), target role,
-   sections wanted, tone (minimal, bold, playful, corporate), colour/font preferences,
-   light/dark mode, single page vs multi-page, any free-text instructions.
-4. **Design inspiration** — up to 3 reference URLs (websites/portfolios), optional
-   uploaded screenshots, or preset style cards. The backend captures each reference and
-   extracts a *design brief* (palette, typography, layout patterns, spacing, mood).
-   It is used as inspiration only — no copying of text, images, or assets.
-5. **Review & generate** — summary screen, then one click to generate.
-
-### Stage 2 — Refine (editor workspace)
-1. **Code editor** — multi-file (index.html, styles.css, script.js, …) with syntax
-   highlighting, file tree, and save.
-2. **Live preview** — sandboxed iframe that updates as code changes; desktop / tablet /
-   mobile widths.
-3. **Prompt editing** — "Make the hero section darker and add a testimonials section."
-   The AI edits only the files it needs to, and shows a diff the user can accept or reject.
-4. **Regenerate** — whole site (optionally with changed requirements/inspiration) or a
-   single section.
-5. **Version history** — every AI edit and manual save is a version; restore any version.
-6. **Export / publish** — download ZIP first; one-click hosting later.
+> **Confirmed decisions**
+> - Output: **plain HTML + CSS + JavaScript**, delivered as a **ZIP** (no hosting yet)
+> - Backend: **TypeScript** (Node, Cloud Run)
+> - AI: **model-agnostic** — works with any LLM provider (Anthropic, OpenAI, Google,
+>   OpenAI-compatible endpoints such as OpenRouter / Ollama), with graceful
+>   degradation when a model lacks a capability
+> - Frontend: **Flutter Web**
 
 ---
 
-## 2. Architecture
+## 1. Why use this instead of just asking Claude (or any chatbot)?
 
-```
-┌──────────────────────────── Flutter Web (client) ─────────────────────────────┐
-│  Intake wizard  │  Editor workspace (Monaco + preview iframe + AI chat panel)  │
-│  Riverpod state · go_router · Firebase Auth/Firestore/Storage SDKs             │
-└───────────────┬───────────────────────────────────────────────────────────────┘
-                │ HTTPS (Firebase ID token) + SSE for streaming progress
-┌───────────────▼─────────────── Backend API (Cloud Run, TypeScript) ───────────┐
-│  /resume/parse     → Claude (PDF input + structured output)                    │
-│  /inspiration/analyze → Playwright capture → Claude vision → DesignBrief JSON  │
-│  /sites/generate   → Claude + file tools → writes files (streams progress)     │
-│  /sites/edit       → Claude + file tools on existing files → diff              │
-│  /sites/export     → ZIP                                                       │
-└───────────────┬───────────────────────────────────────────────────────────────┘
-                │
-   Firebase Auth · Firestore (metadata) · Cloud Storage (resumes, files, versions,
-   screenshots) · Anthropic API (key held only on the server)
-```
+This is the question the whole product is built around. A general chatbot *can*
+write a portfolio page, but the experience breaks down quickly:
 
-### Why these choices
-| Decision | Choice | Reason |
-|---|---|---|
-| Frontend | Flutter Web | As requested; one codebase can later ship mobile/desktop. |
-| Backend | Node/TypeScript on Cloud Run | Needs a headless browser (Playwright) for reference sites, long-running streamed AI calls, and must keep the API key secret. Cloud Functions are too limiting for Playwright. |
-| Auth/DB/files | Firebase (Auth, Firestore, Storage) | Fast to build, first-class Flutter support, security rules. |
-| AI | Claude API (`claude-opus-5-5`) via the official `@anthropic-ai/sdk` | Native PDF and image input, structured outputs, tool use for file edits, streaming. |
-| Generated site format | Plain HTML/CSS/JS (no build step) | Previews instantly in an iframe, easy to edit by hand, trivially exportable/hostable. A React/Tailwind export can come later. |
-| Code editor | Monaco Editor embedded via `HtmlElementView` | Best-in-class web editing (multi-file, HTML/CSS/JS language services, diff view). Pure-Flutter fallback: `re_editor` or `flutter_code_editor`. |
-| Preview | `<iframe sandbox="allow-scripts" srcdoc=…>` | Isolates user/AI code from the app (no same-origin access). |
+| Pain with a general chatbot | What this app does instead |
+|---|---|
+| You have to know what to ask for and write long prompts. | A guided, portfolio-specific intake asks the right questions. Upload a resume + paste a link → a site in ~1 minute. |
+| Your content is buried inside HTML. Every regeneration risks dropping or rewording details. | **Content lives as structured data** (profile, experience, projects…) separate from design. Change the design 10 times; your content never gets lost or altered. |
+| Every change needs another prompt and another full rewrite. | **Hands-on editing**: click text to edit it, drag sections to reorder, swap a section's layout from a gallery, tweak colours/fonts in a theme panel — all instant, no AI round-trip. Prompts are for what controls can't do. |
+| Output quality varies: inconsistent spacing, broken mobile layout, poor contrast, no SEO. | A **tested section library + design-token theme system** guarantees responsive, accessible, consistent output. A **portfolio score** checks accessibility, SEO, performance, and content, with one-click fixes. |
+| Images, favicon, social preview image, resume PDF — you wire them up yourself. | **Asset pipeline**: upload once; images are resized/compressed, favicon and Open Graph image generated, everything bundled with correct paths in the ZIP. |
+| "Make it look like this site" needs you to describe it. | Paste a URL; the app **captures the site and extracts its palette, fonts, and layout patterns** into a design brief you can mix and match ("colours from A, layout from B"). |
+| AI rewrites your achievements and may invent facts. | The content assistant **improves wording but never invents facts** — it asks you for numbers and leaves visible placeholders instead of guessing. |
+| No history, no undo, no diff; copy-pasting code between chat and files. | Projects persist, every change is a version, AI edits show a diff you accept or reject, and there's a real code editor with live preview. |
+| Locked into one AI vendor. | Choose the model/provider; bring your own key. |
+| Website builders (Wix, Squarespace, Framer) lock you into their platform. | You **own the code**: clean, readable HTML/CSS/JS in a ZIP that runs anywhere (GitHub Pages, Netlify, any host). |
+
+**Positioning:** *"The fastest way to a professional, personal portfolio site that you
+fully own — tailored by AI, refined by hand, exported as clean code."*
+
+**Success metrics**
+- Time from sign-up to first generated site: **< 2 minutes**
+- ≥ **80 %** of edits done through visual controls (no prompt needed)
+- Every exported site scores **≥ 90** on accessibility/SEO checks out of the box
 
 ---
 
-## 3. Data model (Firestore + Storage)
+## 2. Core idea: structured content + design spec + deterministic renderer
+
+The key architectural decision that makes the app better than free-form AI generation:
 
 ```
-users/{uid}
-  displayName, email, plan, createdAt
-
-projects/{projectId}
-  ownerId, name, status: draft|generating|ready|error
-  profile:       { name, headline, bio, contact, socials[], photoUrl }
-  resume:        { storagePath, parsedAt, parsed: ResumeData }
-  requirements:  { purpose, targetRole, sections[], tone, colors, fonts,
-                   darkMode, layout: single|multi, notes }
-  inspiration:   [{ url | screenshotPath, brief: DesignBrief, capturedAt }]
-  currentVersionId, createdAt, updatedAt
-
-projects/{projectId}/versions/{versionId}
-  createdAt, source: generate|ai_edit|manual|regenerate_section
-  prompt (if AI), summary, parentVersionId
-  manifestPath   → Storage: projects/{id}/versions/{vid}/manifest.json
-                   (map of path → content hash; file bodies stored by hash)
-
-projects/{projectId}/chat/{messageId}
-  role, text, versionId, createdAt
+ Portfolio Content (JSON)   +   Site Spec (JSON)   ──►  Renderer (TypeScript)  ──►  HTML/CSS/JS files
+   who you are, what you did      how it looks           deterministic, tested       preview + ZIP
+                                                          ▲
+                              custom code layer ──────────┘  (hand-written or AI-written
+                                                             sections / CSS / JS, preserved)
 ```
 
-Site files live in Cloud Storage (Firestore has a 1 MB document limit). Content-
-addressed storage (files keyed by hash) keeps versions cheap.
+- **Portfolio Content** — the facts: profile, experience, projects, skills, links,
+  images. Edited via forms, imported from resume/GitHub, polished by the content
+  assistant.
+- **Site Spec** — the design: theme tokens (colours, fonts, radius, spacing, motion),
+  which sections appear and in what order, which layout *variant* each section uses,
+  per-section options, and SEO settings.
+- **Renderer** — a pure TypeScript function `render(content, spec, custom) → files`.
+  Same input always gives the same output. Used in the browser (instant preview) and on
+  the server (export).
+- **Custom code layer** — `custom.css`, `custom.js`, and any section the user (or AI)
+  has hand-coded. Always preserved across re-renders.
 
-Core shared types (Dart models via `freezed` + `json_serializable`; mirrored in TS with
-`zod`):
+Why this matters:
+- **Reliability across all models** — the AI mostly produces small, validated JSON
+  (pick a variant, set tokens, add a section) rather than thousands of lines of HTML.
+  Even small/cheap models do this well; big models are only needed for custom code.
+- **Instant, free edits** — theme and layout changes are re-renders, not AI calls.
+- **Content safety** — redesigning never touches your facts.
+- **Consistent quality** — every section variant is responsive, accessible, and tested once.
+
+---
+
+## 3. Features (portfolio-specific)
+
+### 3.1 Intake (fast path first)
+1. **Choose your profile type** — Developer, Designer, Product/PM, Data/ML, Writer,
+   Photographer/Artist, Academic/Researcher, Student/New grad, Freelancer/Consultant,
+   Other. Sets default sections, tone, and import suggestions.
+2. **Import** (each optional):
+   - Resume upload (PDF/DOCX) → structured content.
+   - LinkedIn: guide the user to download their LinkedIn profile as PDF, parsed like a resume.
+   - GitHub username → pinned/top repos, languages, stars, README summaries → project cards.
+   - ORCID ID (academics) → publications.
+   - Blog RSS / Medium / dev.to feed → writing section.
+3. **Review content** — editable forms pre-filled from imports, with a
+   *missing-content checklist* ("Add a photo", "Projects have no images",
+   "No contact method").
+4. **Goals & requirements** — purpose (job search / freelance clients / academic /
+   personal brand), target role, tone (minimal, bold, playful, elegant, technical),
+   colour/font preferences, light/dark/auto, free-text notes.
+5. **Inspiration** — up to 3 URLs or screenshots, or pick from a curated style gallery.
+   Shows extracted palette, fonts, and layout traits as chips; the user toggles what
+   to borrow from each.
+6. **Generate** — produces **3 design directions** as thumbnails; the user picks one
+   (or regenerates). Only design varies; content is shared.
+
+### 3.2 Section library (each with 2–5 layout variants)
+| Section | Example variants |
+|---|---|
+| Hero | split-with-photo, centered, big-typography, terminal (dev), full-bleed image |
+| About | text + photo, highlights list, stats row |
+| Experience | timeline, cards, compact list |
+| Projects | card grid, featured + grid, list, masonry gallery; optional **case-study pages** (`projects/<slug>.html`) |
+| Skills | tag cloud, grouped columns, icon/logo grid |
+| Education / Certifications / Awards | list, cards |
+| Publications | citation list with links (academic) |
+| Writing | post list from RSS/import |
+| Testimonials | quotes grid, carousel |
+| Services (freelance) | cards with optional pricing |
+| Gallery | grid, masonry, with lightbox |
+| Talks / Open source / Volunteering | list, cards |
+| Contact | simple links, mailto CTA, form (via Formspree or similar, user's own ID) |
+| Navigation & Footer | sticky, minimal, sidebar |
+
+Shared JS behaviours (included only when used): mobile nav, active-link highlighting,
+light/dark toggle, scroll reveal (respects `prefers-reduced-motion`), project tag filter,
+lightbox, copy-email button, typed-text hero.
+
+### 3.3 Theme system (design tokens → CSS custom properties)
+Colours (background, surface, text, muted, primary, accent, border — light and dark
+sets), heading/body/mono fonts (curated Google Fonts pairs), type scale, border
+radius, spacing density, shadow style, motion level, content width, section divider
+style. Contrast is checked live as you change colours.
+
+### 3.4 Editor workspace
+- **Visual mode** (default)
+  - Live preview with desktop / tablet / mobile widths.
+  - Click any text in the preview to edit it inline (writes back to Portfolio Content).
+  - Sections panel: add, remove, drag to reorder, hide, switch variant from a thumbnail gallery.
+  - Theme panel: colours, fonts, spacing, radius, motion, with presets.
+  - Content panel: forms for every content type; image upload/crop.
+- **Code mode**
+  - Monaco editor (the VS Code editor) with file tree, syntax highlighting, HTML/CSS/JS
+    language support, live preview.
+  - Generated sections are delimited by markers (`<!-- pb:section id="projects" -->`).
+    Editing inside a section's code turns it into a **custom section** (confirmation
+    shown; reversible). `custom.css` / `custom.js` are always freely editable.
+- **AI assistant panel** — see §4.3.
+- **Versions** — every save/AI edit is a version; restore or compare (diff view).
+
+### 3.5 Content assistant
+- Rewrite bullets for impact (action verb + outcome), tuned to the target role.
+- **Never invents facts**: when a number would help it asks, or inserts a highlighted
+  placeholder like `[X%]` that blocks export until filled or removed.
+- Headline/tagline suggestions (3 options).
+- Project **case-study interview**: asks problem → your role → process → outcome, then
+  writes the case study.
+- Tone consistency pass across the whole site.
+- Spelling and grammar check.
+
+### 3.6 Portfolio score & auto-fix
+Checks run on every render (cheap ones in-browser, full ones on export via Playwright + axe-core):
+- **Accessibility**: colour contrast, alt text, heading order, link names, focus styles.
+- **SEO**: title, meta description, Open Graph/Twitter tags, `Person` JSON-LD,
+  sitemap.xml, robots.txt, canonical URL.
+- **Performance**: image sizes/formats, unused JS, total page weight.
+- **Responsive**: screenshots at 3 widths, horizontal overflow detection.
+- **Content**: missing contact, empty sections, placeholders left, broken links.
+Each finding has a one-click fix where possible (generate alt text, compress image,
+write meta description).
+
+### 3.7 Assets & export
+- Images converted to WebP + fallback, resized to needed widths (`srcset`), EXIF stripped.
+- Avatar cropper; favicon from photo or initials; auto-generated Open Graph image.
+- Resume PDF included as a download button (optional).
+- **ZIP** contents:
+  ```
+  index.html
+  projects/<slug>.html          (if case studies enabled)
+  assets/css/theme.css base.css sections.css custom.css
+  assets/js/main.js custom.js
+  assets/img/…  favicon.ico  og-image.png
+  resume.pdf  robots.txt  sitemap.xml
+  README.md                     (how to deploy to GitHub Pages / Netlify / any host)
+  ```
+
+### 3.8 Later (post-MVP)
+- **Job-tailored variants**: paste a job description → a variant of the site that
+  reorders projects and highlights matching skills, sharing the same content.
+- One-click hosting/publishing and custom domains.
+- Analytics snippet setup, contact form hosting.
+- Template marketplace, team/agency mode.
+
+---
+
+## 4. AI design (model-agnostic)
+
+### 4.1 LLM gateway
+All AI calls go through one backend interface; no feature talks to a provider directly.
 
 ```ts
-ResumeData   { summary, experience[{company, role, start, end, bullets[]}],
-               education[], skills[{category, items[]}], projects[{name,
-               description, tech[], link}], certifications[], awards[] }
-DesignBrief  { palette{primary, secondary, accent, background, text},
-               typography{headingFont, bodyFont, scale}, layoutPatterns[],
-               sectionStyles[], spacing, mood[], notableDetails[] }
-SiteFiles    { [path: string]: string }
+interface LlmGateway {
+  generate<T>(req: {
+    task: TaskName;                 // e.g. "resume.parse", "design.directions"
+    system: string;
+    messages: Message[];            // text, image, and document parts
+    schema?: ZodSchema<T>;          // structured output
+    tools?: ToolDef[];              // for edit operations
+    stream?: boolean;
+  }): Promise<Result<T>> | AsyncIterable<Event>;
+}
+```
+
+- **Implementation**: Vercel AI SDK (`ai` + `@ai-sdk/anthropic`, `@ai-sdk/openai`,
+  `@ai-sdk/google`, `@ai-sdk/openai-compatible`) wrapped behind our own interface so it
+  can be swapped for official SDKs per provider if needed.
+- **Model registry** (config, not code): each model's id, provider, context window, and
+  capability flags — `pdfInput`, `imageInput`, `structuredOutput`, `toolUse`,
+  `streaming`, `promptCaching`.
+- **Task routing**: each task has a tier (`fast` or `smart`); the user/admin maps tiers
+  to models. Defaults: `smart` = a top-tier model (e.g. Claude Opus), `fast` = a small,
+  cheap model (e.g. Claude Haiku). Any provider can fill either tier.
+- **Bring your own key** (optional): user keys encrypted with Cloud KMS, never sent to
+  the client.
+
+### 4.2 Capability fallbacks (so every model works)
+| Capability missing | Fallback |
+|---|---|
+| PDF input | Extract text server-side (`pdfjs-dist`; `mammoth` for DOCX), send as text. |
+| Image input (vision) | Inspiration brief built from extracted computed styles/DOM only; screenshots skipped. |
+| Native structured output | JSON instructions in prompt → parse → validate with zod → one "repair" retry with the validation errors → fail clearly. |
+| Tool calling | Model returns a JSON `operations[]` array (same schema as tools), validated the same way. |
+| Streaming | Show step-level progress instead of token streaming. |
+| Small context window | Send only the relevant section's code/content (we always know which section is affected). |
+| Prompt caching | Optional optimisation only; nothing depends on it. |
+
+Prompts are written in plain, provider-neutral language (no vendor-specific tags or
+features). A **cross-model eval suite** (§7) runs every prompt against each supported
+model before release.
+
+### 4.3 AI tasks
+| Task | Tier | Input | Output |
+|---|---|---|---|
+| `resume.parse` | fast | PDF/DOCX (or text) | `PortfolioContent` (partial) |
+| `github.summarize` | fast | repo metadata + README | project cards |
+| `inspiration.analyze` | smart | screenshots + computed styles | `DesignBrief` |
+| `design.directions` | smart | content summary + goals + briefs | 3 × `SiteSpec` |
+| `content.rewrite` / `content.caseStudy` / `content.tagline` | fast/smart | content item + goals | suggestions (user accepts) |
+| `assistant.edit` | smart | user prompt + spec + selection + relevant code | `operations[]` |
+| `section.custom` | smart | prompt + theme tokens + content | custom section HTML/CSS/JS |
+| `fix.altText`, `fix.metaDescription` | fast | image / content | text |
+
+### 4.4 The assistant: prompts become operations
+A user prompt ("make it warmer and add testimonials under projects") is turned into a
+list of typed operations, each validated before being applied:
+
+```
+updateTheme(tokens) · setVariant(sectionId, variant) · addSection(type, variant, position)
+removeSection(id) · moveSection(id, position) · updateContent(path, value)
+setSectionOptions(id, options) · editCustomCode(file, find, replace) · createCustomSection(...)
+```
+
+- Most requests map to spec/content operations (cheap, safe, instant re-render).
+- Only requests that the library can't express fall through to custom code.
+- The result is shown as a **change summary + diff**; the user accepts or rejects.
+  Accepting creates a version.
+- Content operations that would add new facts are flagged for confirmation.
+- If the user clicked an element in the preview, its section id is attached to the prompt.
+
+**Regenerate options:** whole design (keeps content), one section (new variant/options),
+or a custom section's code.
+
+---
+
+## 5. Architecture
+
+```
+┌───────────────────────────── Flutter Web ─────────────────────────────────────┐
+│ Dashboard · Intake wizard · Editor (visual / code / assistant) · Export          │
+│ Riverpod · go_router · Firebase SDKs                                            │
+│ ┌──────────── JS interop ───────────┐                                           │
+│ │ renderer.js (shared TS package)   │ → preview iframe (sandbox="allow-scripts")│
+│ │ monaco + bridge.js                │                                           │
+│ └───────────────────────────────────┘                                           │
+└───────────────┬───────────────────────────────────────────────────────────────┘
+                │ HTTPS + Firebase ID token; SSE for streamed progress
+┌───────────────▼─────────────── API service (Cloud Run, TypeScript, Fastify) ──┐
+│ projects · imports (resume, GitHub, ORCID, RSS) · ai tasks · assets · export   │
+│ LLM gateway → Anthropic / OpenAI / Google / OpenAI-compatible                  │
+└───────┬───────────────────────────────┬───────────────────────────────────────┘
+        │                               │
+┌───────▼──────────────┐   ┌────────────▼────────────────────────────────────────┐
+│ Capture service       │   │ Firebase Auth · Firestore (metadata, content, spec)   │
+│ (Cloud Run, Playwright│   │ Cloud Storage (uploads, images, versions, ZIPs)       │
+│  isolated, SSRF-safe) │   │ Secret Manager / KMS (API keys)                       │
+│ inspiration capture,  │   └───────────────────────────────────────────────────────┘
+│ quality checks,       │
+│ screenshots           │
+└───────────────────────┘
+```
+
+### Repository layout (monorepo)
+```
+app/                      Flutter Web app
+  lib/
+    app/                  router, theme
+    core/                 api client (dio + SSE), auth, errors
+    models/               generated from JSON Schema (see below)
+    features/
+      dashboard/
+      intake/             wizard steps + controller
+      editor/
+        visual/           sections panel, theme panel, content forms, inline edit
+        code/             monaco widget, file tree
+        assistant/        chat panel, change summary, diff dialog
+        preview/          iframe widget, device toggle, click-to-select bridge
+        versions/
+      score/              portfolio score panel
+      export/
+  web/                    index.html, monaco loader, bridge.js, renderer.js (built)
+packages/
+  schema/                 zod schemas: PortfolioContent, SiteSpec, DesignBrief,
+                          Operation → exported as JSON Schema
+  renderer/               render(content, spec, custom) → files; section templates,
+                          variants, theme → CSS, behaviours JS; snapshot tests
+  checks/                 portfolio score rules (shared by browser + server)
+backend/
+  api/                    Fastify app, routes, auth middleware
+  llm/                    gateway, model registry, prompts, fallbacks
+  imports/                resume, github, orcid, rss
+  assets/                 sharp image pipeline, favicon, OG image
+  export/                 zip builder
+capture/                  Playwright capture + quality-check service
+evals/                    cross-model eval sets and runner
+```
+
+- **Single source of truth for types**: zod schemas in `packages/schema` → JSON Schema →
+  Dart models generated with `quicktype` (+ `freezed`-style immutability). CI fails if
+  generated code is stale.
+- **Renderer runs in the browser** (bundled with esbuild, called from Dart via
+  `dart:js_interop`) for instant preview, and on the server for export — identical output.
+
+---
+
+## 6. Data model
+
+```
+users/{uid}               displayName, email, plan, modelPrefs, byoKeyRef?
+projects/{pid}            ownerId, name, profileType, goals, status,
+                          content: PortfolioContent      (≤ ~200 KB; large text in Storage)
+                          spec: SiteSpec
+                          custom: { css, js, sections: {id → {html, css, js}} }
+                          inspiration: [{source, brief, screenshotPaths}]
+                          currentVersionId, score, updatedAt
+projects/{pid}/versions/{vid}
+                          createdAt, source (manual|assistant|regenerate|import),
+                          prompt?, summary, snapshotPath (content+spec+custom JSON in Storage)
+projects/{pid}/assets/{aid}
+                          originalPath, variants[{width, format, path}], alt, usage
+```
+
+Key schemas (abridged):
+```ts
+PortfolioContent {
+  profile: { name, headline, tagline, bio, location, email, photo, socials[] }
+  experience[]: { id, company, role, start, end, location, bullets[], tech[] }
+  projects[]:   { id, title, summary, role, tech[], links[], images[], tags[],
+                  featured, caseStudy?: { problem, role, process, outcome, body } }
+  skills[]:     { group, items[] }
+  education[], certifications[], awards[], publications[], writing[],
+  testimonials[], services[], talks[], custom[]
+}
+SiteSpec {
+  theme: { colors: {light, dark}, fonts, scale, radius, density, shadow, motion,
+           width, colorMode: light|dark|auto }
+  nav: { variant, items[] }
+  sections[]: { id, type, variant, visible, options, custom: boolean }
+  pages: { caseStudies: boolean }
+  seo: { title, description, url?, ogImage, keywords[] }
+}
 ```
 
 ---
 
-## 4. Backend API
-
-All endpoints require a Firebase ID token; long operations stream progress via
-Server-Sent Events.
-
-| Endpoint | Input | Output |
-|---|---|---|
-| `POST /projects/:id/resume/parse` | Storage path of the uploaded resume | `ResumeData` |
-| `POST /projects/:id/inspiration/analyze` | `{url}` or `{screenshotPath}` | `DesignBrief` + screenshot path |
-| `POST /projects/:id/generate` (SSE) | optional overrides | progress events → new `versionId` |
-| `POST /projects/:id/edit` (SSE) | `{prompt, baseVersionId, selection?}` | progress + diff → new `versionId` |
-| `POST /projects/:id/regenerate-section` (SSE) | `{sectionId, prompt?}` | new `versionId` |
-| `POST /projects/:id/versions` | `{files, baseVersionId}` (manual save) | `versionId` |
-| `GET  /projects/:id/export?version=` | — | ZIP |
-
-### AI pipelines (Claude API)
-
-**Resume parsing**
-- Send the PDF as a `document` content block (DOCX → convert to text first with
-  `mammoth`).
-- Use structured outputs (`output_config.format` with the `ResumeData` JSON schema) so
-  the response always matches the schema.
-- Low effort is enough; this is extraction.
-
-**Inspiration analysis**
-- Playwright loads the URL (desktop 1440px + mobile 390px), takes full-page screenshots,
-  and extracts computed styles (fonts, CSS custom properties, dominant colours).
-- Send the screenshots (image blocks) + extracted style data to Claude and ask for a
-  `DesignBrief` via structured outputs.
-- Guard against SSRF: allow only http/https, resolve DNS and block private/loopback
-  IP ranges, set timeouts and page-size limits.
-
-**Site generation**
-- System prompt (static, cached): role, output rules (semantic HTML, responsive,
-  accessible, no external assets except Google Fonts, every section tagged with
-  `data-section="…"`, don't copy reference content), file conventions.
-- User message: profile + `ResumeData` + requirements + `DesignBrief`s.
-- Give Claude file tools — `write_file(path, content)`, `edit_file(path, old, new)`,
-  `delete_file(path)` — with `strict: true`, run with the SDK tool runner, and stream so
-  the UI can show "Writing styles.css…".
-- Adaptive thinking, `effort: "high"` for first generation.
-
-**Prompt editing / regenerate section**
-- Same system prompt + current files (cached prefix) + the user's request (+ selected
-  element/section if the user clicked one in the preview).
-- Claude uses `edit_file` for targeted changes instead of rewriting everything →
-  faster, cheaper, and a clean diff.
-- Server applies the edits to a copy, validates (HTML parses, referenced files exist),
-  stores a new version, and returns a diff. The user accepts (becomes current) or
-  rejects.
-- Keep recent chat turns so follow-ups like "make it a bit lighter" work.
-
-**Cost & reliability**
-- Prompt caching on the system prompt and current file set.
-- Handle `stop_reason` (`max_tokens`, `refusal`) and retry/report clearly.
-- Per-user rate limits and a daily generation quota.
+## 7. Quality & testing
+- **Renderer**: snapshot tests for every section × variant × theme sample; Playwright
+  visual tests at 3 widths; axe-core accessibility tests — the library must pass before
+  any AI is involved.
+- **Schema/operations**: unit tests that every operation validates and applies correctly.
+- **Backend**: route tests, SSRF guard tests, import parsers against fixture resumes,
+  ZIP structure tests.
+- **Flutter**: unit tests for controllers, widget tests for wizard/editor panels,
+  integration test for intake → generate → edit → export with a mocked API.
+- **Cross-model evals** (`evals/`): ~30 sample resumes, ~15 reference sites, ~50 edit
+  prompts. Scored on schema validity, factual fidelity (no invented facts), operation
+  correctness, and rendered portfolio score. Run per supported model; a model is only
+  listed as supported if it passes.
 
 ---
 
-## 5. Flutter app structure
-
-```
-lib/
-  main.dart
-  app/            router.dart (go_router), theme.dart
-  core/           api_client.dart (dio + SSE), auth/, env.dart, errors.dart
-  models/         profile.dart, resume_data.dart, requirements.dart,
-                  design_brief.dart, project.dart, site_version.dart
-  data/           project_repository.dart, storage_repository.dart
-  features/
-    auth/         sign_in_page.dart
-    dashboard/    projects_page.dart (list, create, open)
-    intake/
-      intake_wizard_page.dart     (Stepper / PageView, progress saved per step)
-      steps/ details_step.dart, resume_step.dart, resume_review_step.dart,
-             requirements_step.dart, inspiration_step.dart, review_step.dart
-      intake_controller.dart      (Riverpod Notifier, autosaves draft)
-    editor/
-      editor_page.dart            (3-pane responsive layout)
-      widgets/ file_tree.dart, monaco_editor.dart, preview_frame.dart,
-               device_toggle.dart, ai_chat_panel.dart, diff_dialog.dart,
-               version_history_drawer.dart
-      editor_controller.dart      (open files, dirty state, current version)
-    export/       export_dialog.dart
-web/
-  index.html
-  monaco/         monaco loader + bridge.js (postMessage ↔ Dart)
-```
-
-Key packages: `flutter_riverpod`, `go_router`, `firebase_core`, `firebase_auth`,
-`cloud_firestore`, `firebase_storage`, `file_picker`, `dio`, `freezed`,
-`json_serializable`, `web` (for `HtmlElementView`/iframe interop), `flutter_markdown`.
-
-### Editor workspace details
-- **Layout**: file tree | Monaco | preview, with the AI chat panel as a right drawer.
-  Collapses to tabs on narrow screens.
-- **Monaco bridge**: Monaco runs in a `HtmlElementView` div; Dart ↔ JS via
-  `dart:js_interop` (`setValue`, `onChange`, `setLanguage`, `showDiff`).
-- **Preview**: build a single `srcdoc` by inlining `styles.css`/`script.js` into
-  `index.html` (or use blob URLs for multi-page). Debounce refresh ~400 ms.
-- **Click-to-select**: inject a small script into the preview that, in "select mode",
-  highlights hovered elements and posts the nearest `data-section` + a CSS path to the
-  parent window. That selection is attached to the next AI prompt.
-- **Unsaved changes**: manual edits are local until "Save" (creates a version).
-  An AI edit on top of unsaved changes saves them first.
+## 8. Security & privacy
+- API keys (platform and BYO) only on the server (Secret Manager / KMS).
+- Firestore/Storage rules: owner-only access.
+- Uploads: type and size limits (resume ≤ 10 MB, images ≤ 15 MB), virus-scan optional,
+  EXIF stripped; users can delete their data and resume at any time.
+- Preview iframe sandboxed (`allow-scripts`, no `allow-same-origin`); click-to-select
+  uses `postMessage` with origin checks.
+- Capture service isolated: http/https only, DNS resolved and private/loopback/metadata
+  IPs blocked, timeouts, page-size limits, no cookies.
+- Inspiration is for style only; prompts forbid copying third-party text, images, or
+  logos, and captured screenshots are never included in exports.
+- Per-user rate limits and AI usage quotas; usage logged per task and model.
 
 ---
 
-## 6. Security & privacy
-- Anthropic API key only on the backend (Secret Manager); never in the Flutter bundle.
-- Firestore/Storage rules: users can only read/write their own projects.
-- Resume uploads: PDF/DOCX only, ≤10 MB, stored privately; let users delete them.
-- Preview iframe: `sandbox="allow-scripts"` without `allow-same-origin`.
-- SSRF protection on the URL capture service; capture runs in its own Cloud Run service
-  with no access to internal resources.
-- Tell users that reference sites are used for style only, and instruct the model not
-  to reproduce third-party text, logos, or images.
-
----
-
-## 7. Phased roadmap
+## 9. Roadmap
 
 | Phase | Deliverable | Est. |
 |---|---|---|
-| **0. Setup** | Flutter web project, Firebase project, Cloud Run backend skeleton, CI (lint, test, deploy preview), auth + dashboard | 1 wk |
-| **1. Intake** | Wizard (details, requirements, inspiration URL input), draft autosave, resume upload → parse → review screen | 2 wk |
-| **2. Inspiration analysis** | Playwright capture service, DesignBrief extraction, brief preview cards in the wizard | 1 wk |
-| **3. Generation** | Generate endpoint with file tools + SSE progress, versions in Storage, basic read-only preview | 1.5 wk |
-| **4. Editor** | Monaco integration, file tree, live preview, device widths, manual save → version, ZIP export | 2 wk |
-| **5. AI editing** | Chat panel, prompt edits with diff accept/reject, regenerate whole site / section, click-to-select | 2 wk |
-| **6. Polish** | Version history UI, error states, quotas/rate limits, accessibility checks on output, analytics | 1 wk |
-| **7. Later** | One-click publish (Firebase Hosting/Netlify/GitHub Pages), custom domains, templates gallery, React/Tailwind export, collaboration | — |
+| **0. Foundations** | Monorepo, CI (lint, typecheck, tests), Firebase project, Fastify skeleton, Flutter shell with auth + dashboard, schema package + Dart codegen | 1 wk |
+| **1. Renderer & library** *(no AI)* | Theme system, ~12 section types × 2–3 variants, behaviours JS, case-study pages, renderer tests; a dev page that renders sample content | 2.5 wk |
+| **2. Intake & content** | Profile types, wizard, content forms, image upload + asset pipeline, **LLM gateway + model registry + fallbacks**, resume parsing, GitHub import | 2 wk |
+| **3. Design generation** | Capture service, inspiration briefs with mix-and-match, curated style gallery, 3 design directions | 1.5 wk |
+| **4. Editor workspace** | Preview with device widths, sections/theme/content panels, inline text editing, Monaco code mode with custom sections, versions, **ZIP export** | 2.5 wk |
+| **5. AI assistant** | Prompt → operations, change summary + diff, click-to-select, regenerate section/design, custom section generation, content assistant (rewrite, tagline, case-study interview) | 2 wk |
+| **6. Score & polish** | Portfolio score + auto-fixes, onboarding polish, quotas, error states | 1.5 wk |
+| **7. Multi-model hardening** | Cross-model eval runs, prompt tuning per tier, BYO key, model picker | 1 wk |
 
-**MVP = Phases 0–5.**
+**MVP = Phases 0–6 (~13 weeks for one developer).** Phase 7 can run in parallel once
+Phase 5 lands. Later items are listed in §3.8.
 
----
-
-## 8. Testing
-- **Flutter**: unit tests for models/controllers; widget tests for wizard steps and
-  editor panes; integration test for wizard → generate → edit flow (with a mocked API).
-- **Backend**: unit tests for file-tool application, diffing, SSRF guard, ZIP export;
-  contract tests that model outputs match the zod schemas.
-- **AI quality**: a small eval set (≈20 sample resumes + reference sites) checked for:
-  valid HTML, responsive at 3 widths (Playwright screenshots), all resume sections
-  present, Lighthouse accessibility score ≥ 90, and edits that change only what was asked.
+**First milestone worth demoing:** end of Phase 2 — upload a resume, get a rendered
+portfolio from the library with a default theme, no design AI yet.
 
 ---
 
-## 9. Open decisions
-1. **Hosting/publishing** — is one-click publishing needed for MVP, or is ZIP export enough?
-2. **Output stack** — plain HTML/CSS/JS (recommended for MVP) vs React/Tailwind.
-3. **Accounts & billing** — free tier limits, paid plans?
-4. **Backend language** — TypeScript recommended (Playwright + Anthropic SDK are both
-   first-class); Python (FastAPI) is a fine alternative if the team prefers it.
+## 10. Remaining open questions
+1. **Default models** — which provider/model should power the free default tiers?
+2. **BYO key** — required for heavy users, optional, or MVP-excluded?
+3. **Accounts** — sign-in required up front, or allow a guest draft and ask for sign-in at export?
+4. **Contact forms** — is linking to the user's own Formspree/Basin ID acceptable for MVP?
