@@ -7,6 +7,9 @@
 >   OpenAI-compatible endpoints such as OpenRouter / Ollama), with graceful
 >   degradation when a model lacks a capability
 > - Frontend: **Flutter Web**
+> - **Sign-in required** (Firebase Auth: Google, GitHub, email + verification)
+> - **Bring your own API key + model picker**, plus a small free starter allowance (§4.5)
+> - **Contact forms link to an external form service** the user already uses (§3.8)
 
 ---
 
@@ -111,7 +114,7 @@ Why this matters:
 | Services (freelance) | cards with optional pricing |
 | Gallery | grid, masonry, with lightbox |
 | Talks / Open source / Volunteering | list, cards |
-| Contact | simple links, mailto CTA, form (via Formspree or similar, user's own ID) |
+| Contact | simple links, mailto CTA, form posting to the user's form service (§3.8) |
 | Navigation & Footer | sticky, minimal, sidebar |
 
 Shared JS behaviours (included only when used): mobile nav, active-link highlighting,
@@ -176,7 +179,27 @@ write meta description).
   README.md                     (how to deploy to GitHub Pages / Netlify / any host)
   ```
 
-### 3.8 Later (post-MVP)
+### 3.8 Contact form via external form service
+Static sites can't send email themselves, so the contact section links to a form
+service the user signs up for (all have free plans):
+
+| Service | User provides | Rendered as |
+|---|---|---|
+| Formspree | form ID (`f/abc123`) | `<form action="https://formspree.io/f/abc123" method="POST">` |
+| Web3Forms | access key | form posting to `api.web3forms.com/submit` with hidden key |
+| Getform / Basin / FormSubmit | endpoint URL | `<form action="<endpoint>">` |
+| Google Forms / Tally / Typeform | share link | "Contact me" button/link (or embed) |
+| None | — | `mailto:` button + copy-email |
+
+- Setup panel with a short how-to per service and a field that validates the ID/URL format.
+- Generated form: name, email, message (fields configurable), honeypot field for spam,
+  client-side validation, accessible labels, success/error messages via `fetch` with a
+  plain-POST fallback when JS is off.
+- In the editor preview, submissions are intercepted ("In your live site this sends to
+  Formspree") so testing doesn't spam the user.
+- Portfolio score flags a form with no endpoint configured.
+
+### 3.9 Later (post-MVP)
 - **Job-tailored variants**: paste a job description → a variant of the site that
   reorders projects and highlights matching skills, sharing the same content.
 - One-click hosting/publishing and custom domains.
@@ -212,8 +235,7 @@ interface LlmGateway {
 - **Task routing**: each task has a tier (`fast` or `smart`); the user/admin maps tiers
   to models. Defaults: `smart` = a top-tier model (e.g. Claude Opus), `fast` = a small,
   cheap model (e.g. Claude Haiku). Any provider can fill either tier.
-- **Bring your own key** (optional): user keys encrypted with Cloud KMS, never sent to
-  the client.
+- **Bring your own key + model picker**: see §4.5.
 
 ### 4.2 Capability fallbacks (so every model works)
 | Capability missing | Fallback |
@@ -261,6 +283,61 @@ setSectionOptions(id, options) · editCustomCode(file, find, replace) · createC
 
 **Regenerate options:** whole design (keeps content), one section (new variant/options),
 or a custom section's code.
+
+### 4.5 AI access: free starter, bring your own key, model picker
+
+**Is anything free?** Yes, with limits:
+- **This app's own AI use is already small.** Theme, layout, section and inline text
+  edits re-render locally with no AI call. Only intake, design generation and assistant
+  prompts use a model, and most of those produce small JSON that cheap models handle.
+- **Free provider tiers exist** (limits change often — re-check before launch):
+  Google Gemini API (free tier, Flash-class models), Groq (free daily limits per model),
+  OpenRouter (`:free` model variants, low daily request caps), Cloudflare Workers AI
+  (daily free allocation). Caveats: low rate limits, and some free tiers allow the
+  provider to use submitted data for training — users must be told this before sending
+  their resume through one.
+- Anthropic and OpenAI have no free API tier, but small models (e.g. Claude Haiku) are
+  cheap enough that a full generation costs a fraction of a cent.
+
+**Access modes** (chosen in Settings → AI):
+
+| Mode | How it works | Best for |
+|---|---|---|
+| **Starter (default)** | Platform key on a low-cost model; monthly allowance per user (e.g. 3 full generations + 50 assistant edits); counters shown in the UI | Trying the app with zero setup |
+| **Bring your own key** | User adds a key for Anthropic, OpenAI, Google Gemini, Groq, OpenRouter, Mistral, or any OpenAI-compatible endpoint (custom base URL); no app limits beyond abuse protection | Regular use, free provider tiers, choosing premium models |
+
+Starter is deliberately not built on a free provider tier: those quotas are per key, so
+one shared key would be exhausted by a handful of users. Free tiers are offered through
+BYO key instead, where each user gets their own quota. The app includes a step-by-step
+"Get a free Gemini / Groq / OpenRouter key" guide.
+
+**Adding a key**
+1. Pick provider → paste key (and base URL for OpenAI-compatible).
+2. Backend validates it with a cheap call (list models), then stores it encrypted
+   (Cloud KMS envelope encryption) in `secrets/{uid}/keys/{keyId}`, a collection the
+   client can never read (Firestore rules deny all; backend only).
+3. UI shows provider, label, last 4 characters, added date; actions: test, rename,
+   replace, delete. Multiple keys allowed (one per provider).
+
+**Selecting a model**
+- Model list fetched live from the provider (`/models`) and merged with the app's
+  **model registry** (capabilities, context window, eval status).
+- Each model shows badges: `Recommended` / `Tested` / `Untested`, and capability icons
+  (reads PDFs, sees images, structured output, tools). Free-tier models are labelled.
+- **Simple mode**: one model for everything. **Advanced mode**: separate *Smart*
+  (design generation, assistant) and *Fast* (parsing, rewrites, alt text) models,
+  possibly from different providers.
+- Warnings explain fallbacks before they happen ("This model can't see images —
+  inspiration will use page styles only").
+- Choice can be overridden per project; switching models never affects existing content.
+
+**Runtime behaviour**
+- Requests always go through the backend gateway (keys never reach the browser).
+- Provider errors are translated into clear messages: invalid key, out of credit,
+  rate-limited (with retry-after), model unavailable — with a one-click
+  "switch to Starter" or "pick another model".
+- Usage dashboard: requests and tokens per provider/model per month (from provider usage
+  fields), so BYO users can track their own spend.
 
 ---
 
@@ -337,12 +414,19 @@ evals/                    cross-model eval sets and runner
 ## 6. Data model
 
 ```
-users/{uid}               displayName, email, plan, modelPrefs, byoKeyRef?
+users/{uid}               displayName, email, authProviders[],
+                          ai: { mode: starter|byo, simple: bool,
+                                smart: {keyId, provider, model}, fast: {...} },
+                          starterUsage: { month, generations, edits }
+secrets/{uid}/keys/{kid}  provider, label, last4, baseUrl?, encryptedKey, createdAt
+                          (backend-only; client rules deny all)
 projects/{pid}            ownerId, name, profileType, goals, status,
                           content: PortfolioContent      (≤ ~200 KB; large text in Storage)
                           spec: SiteSpec
                           custom: { css, js, sections: {id → {html, css, js}} }
                           inspiration: [{source, brief, screenshotPaths}]
+                          contactForm: { service, endpoint|id|link, fields[] }
+                          aiOverride?: { smart, fast }
                           currentVersionId, score, updatedAt
 projects/{pid}/versions/{vid}
                           createdAt, source (manual|assistant|regenerate|import),
@@ -390,8 +474,13 @@ SiteSpec {
 
 ---
 
-## 8. Security & privacy
-- API keys (platform and BYO) only on the server (Secret Manager / KMS).
+## 8. Authentication, security & privacy
+- **Sign-in required** before anything is created: Firebase Auth with Google, GitHub
+  (also reused for the GitHub import), and email/password with mandatory email
+  verification. Backend verifies the Firebase ID token on every request.
+- Account page: change email/password, linked sign-in methods, delete account (removes
+  projects, uploads, keys).
+- API keys: platform key in Secret Manager; BYO keys KMS-encrypted, server-only, never logged.
 - Firestore/Storage rules: owner-only access.
 - Uploads: type and size limits (resume ≤ 10 MB, images ≤ 15 MB), virus-scan optional,
   EXIF stripped; users can delete their data and resume at any time.
@@ -409,25 +498,28 @@ SiteSpec {
 
 | Phase | Deliverable | Est. |
 |---|---|---|
-| **0. Foundations** | Monorepo, CI (lint, typecheck, tests), Firebase project, Fastify skeleton, Flutter shell with auth + dashboard, schema package + Dart codegen | 1 wk |
+| **0. Foundations** | Monorepo, CI (lint, typecheck, tests), Firebase project, Fastify skeleton, Flutter shell with **required sign-in** (Google, GitHub, email) + dashboard, schema package + Dart codegen | 1 wk |
 | **1. Renderer & library** *(no AI)* | Theme system, ~12 section types × 2–3 variants, behaviours JS, case-study pages, renderer tests; a dev page that renders sample content | 2.5 wk |
-| **2. Intake & content** | Profile types, wizard, content forms, image upload + asset pipeline, **LLM gateway + model registry + fallbacks**, resume parsing, GitHub import | 2 wk |
+| **2. Intake & content** | Profile types, wizard, content forms, image upload + asset pipeline, **LLM gateway + model registry + fallbacks**, **Settings → AI (starter allowance, BYO key, model picker)**, resume parsing, GitHub import | 2.5 wk |
 | **3. Design generation** | Capture service, inspiration briefs with mix-and-match, curated style gallery, 3 design directions | 1.5 wk |
-| **4. Editor workspace** | Preview with device widths, sections/theme/content panels, inline text editing, Monaco code mode with custom sections, versions, **ZIP export** | 2.5 wk |
+| **4. Editor workspace** | Preview with device widths, sections/theme/content panels, inline text editing, Monaco code mode with custom sections, contact-form service setup, versions, **ZIP export** | 2.5 wk |
 | **5. AI assistant** | Prompt → operations, change summary + diff, click-to-select, regenerate section/design, custom section generation, content assistant (rewrite, tagline, case-study interview) | 2 wk |
 | **6. Score & polish** | Portfolio score + auto-fixes, onboarding polish, quotas, error states | 1.5 wk |
-| **7. Multi-model hardening** | Cross-model eval runs, prompt tuning per tier, BYO key, model picker | 1 wk |
+| **7. Multi-model hardening** | Cross-model eval runs (incl. free-tier models), prompt tuning per tier, recommended-model labels, usage dashboard | 1 wk |
 
-**MVP = Phases 0–6 (~13 weeks for one developer).** Phase 7 can run in parallel once
-Phase 5 lands. Later items are listed in §3.8.
+**MVP = Phases 0–6 (~13.5 weeks for one developer).** Phase 7 can run in parallel once
+Phase 5 lands. Later items are listed in §3.9.
 
 **First milestone worth demoing:** end of Phase 2 — upload a resume, get a rendered
 portfolio from the library with a default theme, no design AI yet.
 
 ---
 
-## 10. Remaining open questions
-1. **Default models** — which provider/model should power the free default tiers?
-2. **BYO key** — required for heavy users, optional, or MVP-excluded?
-3. **Accounts** — sign-in required up front, or allow a guest draft and ask for sign-in at export?
-4. **Contact forms** — is linking to the user's own Formspree/Basin ID acceptable for MVP?
+## 10. Decisions log & remaining questions
+**Decided:** ZIP export · plain HTML/CSS/JS · TypeScript backend · model-agnostic AI ·
+BYO key + model picker · sign-in required · contact forms via external form service.
+
+**Still open (can be decided during Phase 2):**
+1. Starter allowance size and which low-cost model backs it.
+2. Which free-tier providers to feature in the "get a free key" guide (verify their
+   current limits and data-use terms at that time).
