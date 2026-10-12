@@ -1,5 +1,7 @@
 # Portfolio Builder — Product & Implementation Plan
 
+> Architecture, UI wireframes and control flows: [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+
 > **Confirmed decisions**
 > - Output: **plain HTML + CSS + JavaScript**, delivered as a **ZIP** (no hosting yet)
 > - Backend: **TypeScript** (Node, Cloud Run)
