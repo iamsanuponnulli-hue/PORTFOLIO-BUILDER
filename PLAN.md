@@ -4,13 +4,20 @@
 
 > **Confirmed decisions**
 > - Output: **plain HTML + CSS + JavaScript**, delivered as a **ZIP** (no hosting yet)
-> - Backend: **TypeScript** (Node, Cloud Run)
-> - AI: **model-agnostic** — works with any LLM provider (Anthropic, OpenAI, Google,
->   OpenAI-compatible endpoints such as OpenRouter / Ollama), with graceful
+> - **Thin server, heavy browser**: all processing (AI calls with the user's own key,
+>   resume parsing, images, rendering, checks, ZIP export) runs in the user's browser.
+>   The server only does sign-in, stored data (with security rules), the Starter AI
+>   relay, and account cleanup — small **TypeScript** Cloud Functions (§5)
+> - AI: **model-agnostic** — works with any LLM provider that can be called from a
+>   browser (Anthropic, OpenAI, Google Gemini, Groq, OpenRouter, …), with graceful
 >   degradation when a model lacks a capability
 > - Frontend: **Flutter Web**
 > - **Sign-in required** (Firebase Auth: Google, GitHub, email + verification)
-> - **Bring your own API key + model picker**, plus a small free starter allowance (§4.5)
+> - **Bring your own API key + model picker** — key stored **on this device only**, calls
+>   go straight from the browser to the provider; **Sign in with OpenRouter** as a
+>   no-copy-paste option; plus a small free **Starter** allowance through a relay (§4.5)
+> - **Companion browser extension** (Chrome/Edge) captures reference websites on the
+>   user's own computer (§3.10)
 > - **Contact forms link to an external form service** the user already uses (§3.8)
 > - **Full MVP scope** (Phases 0–6, ~13.5 weeks for one developer)
 > - **4 profile types at launch**: Developer, Designer, Student/New grad, General professional
@@ -31,7 +38,7 @@ write a portfolio page, but the experience breaks down quickly:
 | Every change needs another prompt and another full rewrite. | **Hands-on editing**: click text to edit it, drag sections to reorder, swap a section's layout from a gallery, tweak colours/fonts in a theme panel — all instant, no AI round-trip. Prompts are for what controls can't do. |
 | Output quality varies: inconsistent spacing, broken mobile layout, poor contrast, no SEO. | A **tested section library + design-token theme system** guarantees responsive, accessible, consistent output. A **portfolio score** checks accessibility, SEO, performance, and content, with one-click fixes. |
 | Images, favicon, social preview image, resume PDF — you wire them up yourself. | **Asset pipeline**: upload once; images are resized/compressed, favicon and Open Graph image generated, everything bundled with correct paths in the ZIP. |
-| "Make it look like this site" needs you to describe it. | Paste a URL; the app **captures the site and extracts its palette, fonts, and layout patterns** into a design brief you can mix and match ("colours from A, layout from B"). |
+| "Make it look like this site" needs you to describe it. | Paste a URL; the companion extension **captures the site on your computer and extracts its palette, fonts, and layout patterns** into a design brief you can mix and match ("colours from A, layout from B"). |
 | AI rewrites your achievements and may invent facts. | The content assistant **improves wording but never invents facts** — it asks you for numbers and leaves visible placeholders instead of guessing. |
 | No history, no undo, no diff; copy-pasting code between chat and files. | Projects persist, every change is a version, AI edits show a diff you accept or reject, and there's a real code editor with live preview. |
 | Locked into one AI vendor. | Choose the model/provider; bring your own key. |
@@ -66,8 +73,8 @@ The key architectural decision that makes the app better than free-form AI gener
   which sections appear and in what order, which layout *variant* each section uses,
   per-section options, and SEO settings.
 - **Renderer** — a pure TypeScript function `render(content, spec, custom) → files`.
-  Same input always gives the same output. Used in the browser (instant preview) and on
-  the server (export).
+  Same input always gives the same output. Runs in the browser for both the live
+  preview and the ZIP export, so what you see is exactly what you download.
 - **Custom code layer** — `custom.css`, `custom.js`, and any section the user (or AI)
   has hand-coded. Always preserved across re-renders.
 
@@ -93,21 +100,25 @@ Why this matters:
    | Student / New grad | hero, about, education, projects, skills, experience/internships, awards, contact | Education first, coursework & clubs |
    | General professional | hero, about, experience, highlights/skills, testimonials, contact | Achievements, clear CTA to contact |
    Product/PM, Data/ML, Writer, Photographer/Artist, Academic, Freelancer come after
-   launch (§3.10); the section library already covers most of what they need.
+   launch (§3.11); the section library already covers most of what they need.
 2. **Import** (each optional):
-   - Resume upload (PDF/DOCX) → structured content.
+   - Resume (PDF/DOCX) → structured content. Text is extracted **in the browser**; the
+     file is only uploaded if the user wants a "Download resume" button on their site.
    - LinkedIn: guide the user to download their LinkedIn profile as PDF, parsed like a resume.
-   - GitHub username → pinned/top repos, languages, stars, README summaries → project cards.
-   - Blog RSS / Medium / dev.to feed → writing section.
+   - GitHub username → pinned/top repos, languages, stars, README summaries → project cards
+     (GitHub's API is called directly from the browser).
+   - Blog feed → writing section. dev.to is read directly; other RSS feeds (Medium,
+     personal blogs) are fetched by the extension, since browsers block reading them.
 3. **Review content** — editable forms pre-filled from imports, with a
    *missing-content checklist* ("Add a photo", "Projects have no images",
    "No contact method").
 4. **Goals & requirements** — purpose (job search / freelance clients / academic /
    personal brand), target role, tone (minimal, bold, playful, elegant, technical),
    colour/font preferences, light/dark/auto, free-text notes.
-5. **Inspiration** — up to 3 URLs or screenshots, or pick from a curated style gallery.
-   Shows extracted palette, fonts, and layout traits as chips; the user toggles what
-   to borrow from each.
+5. **Inspiration** — up to 3 reference sites captured by the extension (§3.10), uploaded
+   screenshots (works without the extension), or a curated style gallery. Shows
+   extracted palette, fonts, and layout traits as chips; the user toggles what to
+   borrow from each.
 6. **Generate** — produces **3 design directions** as thumbnails; the user picks one
    (or regenerates). Only design varies; content is shared.
 
@@ -166,19 +177,25 @@ style. Contrast is checked live as you change colours.
 - Spelling and grammar check.
 
 ### 3.6 Portfolio score & auto-fix
-Checks run on every render (cheap ones in-browser, full ones on export via Playwright + axe-core):
+All checks run in the browser: quick ones on every render, the full set (axe-core
+injected into the preview, preview resized to 3 widths) before export:
 - **Accessibility**: colour contrast, alt text, heading order, link names, focus styles.
 - **SEO**: title, meta description, Open Graph/Twitter tags, `Person` JSON-LD,
   sitemap.xml, robots.txt, canonical URL.
 - **Performance**: image sizes/formats, unused JS, total page weight.
 - **Responsive**: screenshots at 3 widths, horizontal overflow detection.
-- **Content**: missing contact, empty sections, placeholders left, broken links.
+- **Content**: missing contact, empty sections, placeholders left, broken internal links
+  (external links are checked by the extension when installed).
 Each finding has a one-click fix where possible (generate alt text, compress image,
 write meta description).
 
 ### 3.7 Assets & export
-- Images converted to WebP + fallback, resized to needed widths (`srcset`), EXIF stripped.
-- Avatar cropper; favicon from photo or initials; auto-generated Open Graph image.
+- All image work happens **in the browser, in a background worker** so the UI never
+  freezes: resize to needed widths (`srcset`), encode WebP (canvas, with a WASM encoder
+  where the browser lacks WebP encoding), EXIF stripped by re-encoding.
+- Avatar cropper; favicon from photo or initials; Open Graph image drawn on a canvas.
+- The **ZIP is built in the browser** (renderer + `fflate` in a worker) and downloaded
+  directly — nothing is rendered or zipped on a server.
 - Resume PDF included as a download button (optional).
 - **ZIP** contents:
   ```
@@ -229,7 +246,29 @@ service the user signs up for (all have free plans):
 - Resume parse failure (e.g. a scanned image-only PDF): retry with a vision-capable model
   if available, otherwise fall back to manual entry with a clear message.
 
-### 3.10 Later (post-MVP)
+### 3.10 Companion browser extension
+Browsers don't let a web page read or screenshot other websites (a security rule that
+WASM doesn't change). A small extension, which the user installs and grants permission
+to, can — and it runs entirely on the user's computer.
+
+- **Browsers**: Chrome and Edge at launch (also works in Brave, Opera, Arc). Firefox
+  and Safari later; their users use screenshot upload meanwhile.
+- **Capture from the app**: user pastes a URL and clicks *Analyze* → the app messages the
+  extension → the extension asks for permission for that one site (first time only),
+  opens it in a background tab, takes screenshots at desktop and mobile width, reads
+  computed styles (fonts, colours, CSS variables, spacing, layout structure), closes the
+  tab, and returns the result to the app.
+- **Capture while browsing**: on any site, click the extension → *Send to Portfolio
+  Builder* → it appears in the inspiration step next time the app is focused.
+- **Feeds & links**: fetches RSS feeds and checks external links for the app.
+- **Minimal permissions**: `activeTab`, `scripting`, `storage`; site access requested per
+  site at capture time (optional host permissions); only our app's domain may message
+  it (`externally_connectable`). Requests omit cookies.
+- **Without the extension**: the app detects it's missing, shows *Install extension*, and
+  offers screenshot upload instead. Nothing else in the app depends on it.
+- Built with TypeScript (Manifest V3), published to the Chrome Web Store and Edge Add-ons.
+
+### 3.11 Later (post-MVP)
 - **Job-tailored variants**: paste a job description → a variant of the site that
   reorders projects and highlights matching skills, sharing the same content.
 - One-click hosting/publishing and custom domains.
@@ -239,13 +278,15 @@ service the user signs up for (all have free plans):
   ORCID import, Freelancer with services/pricing).
 - Paid plans (Stripe): bigger AI allowance, more projects.
 - Translated app UI and right-to-left site support.
+- Firefox and Safari versions of the extension.
 
 ---
 
 ## 4. AI design (model-agnostic)
 
 ### 4.1 LLM gateway
-All AI calls go through one backend interface; no feature talks to a provider directly.
+All AI calls go through one **client-side** gateway — a TypeScript package that runs in
+the browser (like the renderer). No feature talks to a provider directly.
 
 ```ts
 interface LlmGateway {
@@ -261,11 +302,16 @@ interface LlmGateway {
 ```
 
 - **Implementation**: Vercel AI SDK (`ai` + `@ai-sdk/anthropic`, `@ai-sdk/openai`,
-  `@ai-sdk/google`, `@ai-sdk/openai-compatible`) wrapped behind our own interface so it
-  can be swapped for official SDKs per provider if needed.
+  `@ai-sdk/google`, `@ai-sdk/openai-compatible`) running in the browser, wrapped behind
+  our own interface so it can be swapped for official SDKs per provider if needed.
+- **Two transports**: *direct* (user's own key → provider, straight from the browser)
+  and *relay* (Starter → our relay function → provider). Everything else — prompts,
+  fallbacks, validation, repair retries — is identical and runs in the browser.
 - **Model registry** (config, not code): each model's id, provider, context window, and
   capability flags — `pdfInput`, `imageInput`, `structuredOutput`, `toolUse`,
-  `streaming`, `promptCaching`.
+  `streaming`, `promptCaching`, `browserCallable` (provider allows calls from a web page;
+  e.g. Anthropic needs its direct-browser-access header). Providers that block browser
+  calls aren't offered for own keys.
 - **Task routing**: each task has a tier (`fast` or `smart`); the user/admin maps tiers
   to models. Defaults: `smart` = a top-tier model (e.g. Claude Opus), `fast` = a small,
   cheap model (e.g. Claude Haiku). Any provider can fill either tier.
@@ -274,7 +320,7 @@ interface LlmGateway {
 ### 4.2 Capability fallbacks (so every model works)
 | Capability missing | Fallback |
 |---|---|
-| PDF input | Extract text server-side (`pdfjs-dist`; `mammoth` for DOCX), send as text. |
+| PDF input | Extract text in the browser (`pdfjs-dist`; `mammoth` for DOCX), send as text. Scanned PDFs: pdf.js renders pages to images for a vision model. |
 | Image input (vision) | Inspiration brief built from extracted computed styles/DOM only; screenshots skipped. |
 | Native structured output | JSON instructions in prompt → parse → validate with zod → one "repair" retry with the validation errors → fail clearly. |
 | Tool calling | Model returns a JSON `operations[]` array (same schema as tools), validated the same way. |
@@ -342,15 +388,17 @@ or a custom section's code.
 
 Starter is deliberately not built on a free provider tier: those quotas are per key, so
 one shared key would be exhausted by a handful of users. Free tiers are offered through
-BYO key instead, where each user gets their own quota. The app includes a step-by-step
+own keys instead, where each user gets their own quota. The app includes a step-by-step
 "Get a free Gemini / Groq / OpenRouter key" guide.
 
-**Adding a key**
-1. Pick provider → paste key (and base URL for OpenAI-compatible).
-2. Backend validates it with a cheap call (list models), then stores it encrypted
-   (Cloud KMS envelope encryption) in `secrets/{uid}/keys/{keyId}`, a collection the
-   client can never read (Firestore rules deny all; backend only).
-3. UI shows provider, label, last 4 characters, added date; actions: test, rename,
+**Adding a key — stored on this device only**
+1. Pick provider → paste key (and base URL for OpenAI-compatible), **or** click
+   **Sign in with OpenRouter**: the user logs in on OpenRouter and the app receives a
+   key automatically (OAuth PKCE) — no copy-paste.
+2. The browser validates it with a cheap call to the provider (list models).
+3. The key is encrypted with a non-extractable WebCrypto key and kept in this browser's
+   IndexedDB. **It is never sent to our servers.** On a new device the user adds it again.
+4. UI shows provider, label, last 4 characters, added date; actions: test, rename,
    replace, delete. Multiple keys allowed (one per provider).
 
 **Selecting a model**
@@ -366,48 +414,58 @@ BYO key instead, where each user gets their own quota. The app includes a step-b
 - Choice can be overridden per project; switching models never affects existing content.
 
 **Runtime behaviour**
-- Requests always go through the backend gateway (keys never reach the browser).
+- **Own key**: the browser calls the provider directly. Our server never sees the
+  request, the key, or the user's data.
+- **Starter**: the browser sends the request to our **relay** function, which checks the
+  sign-in token, checks and counts the monthly allowance, adds our key, forwards to the
+  provider and streams the answer back. It only waits on the network — no processing.
+  Abuse limits: Starter model only, caps on input size and output tokens, per-user rate limit.
 - Provider errors are translated into clear messages: invalid key, out of credit,
   rate-limited (with retry-after), model unavailable — with a one-click
   "switch to Starter" or "pick another model".
 - Usage dashboard: requests and tokens per provider/model per month (from provider usage
-  fields), so BYO users can track their own spend.
+  fields, recorded by the browser), so own-key users can track their own spend.
 
 ---
 
 ## 5. Architecture
 
 ```
-┌───────────────────────────── Flutter Web ─────────────────────────────────────┐
-│ Dashboard · Intake wizard · Editor (visual / code / assistant) · Export          │
-│ Riverpod · go_router · Firebase SDKs                                            │
-│ ┌──────────── JS interop ───────────┐                                           │
-│ │ renderer.js (shared TS package)   │ → preview iframe (sandbox="allow-scripts")│
-│ │ monaco + bridge.js                │                                           │
-│ └───────────────────────────────────┘                                           │
-└───────────────┬───────────────────────────────────────────────────────────────┘
-                │ HTTPS + Firebase ID token; SSE for streamed progress
-┌───────────────▼─────────────── API service (Cloud Run, TypeScript, Fastify) ──┐
-│ projects · imports (resume, GitHub, RSS) · ai tasks · assets · export          │
-│ LLM gateway → Anthropic / OpenAI / Google / OpenAI-compatible                  │
-└───────┬───────────────────────────────┬───────────────────────────────────────┘
-        │                               │
-┌───────▼──────────────┐   ┌────────────▼────────────────────────────────────────┐
-│ Capture service       │   │ Firebase Auth · Firestore (metadata, content, spec)   │
-│ (Cloud Run, Playwright│   │ Cloud Storage (uploads, images, versions, ZIPs)       │
-│  isolated, SSRF-safe) │   │ Secret Manager / KMS (API keys)                       │
-│ inspiration capture,  │   └───────────────────────────────────────────────────────┘
-│ quality checks,       │
-│ screenshots           │
-└───────────────────────┘
+┌──────────────────────────── User's computer ────────────────────────────────────┐
+│ Flutter Web app — dashboard · intake · editor · settings                           │
+│   Riverpod · go_router · Firebase SDKs (Auth, Firestore, Storage)                 │
+│   TS packages via JS interop, heavy work in Web Workers:                          │
+│     renderer · ai gateway · imports (pdf, docx, github) · assets (images)         │
+│     checks (axe) · export (zip) · Monaco editor · preview iframe (sandboxed)      │
+│ Companion extension (Chrome/Edge) — reference-site capture, RSS, link checks       │
+└──────┬──────────────────────────┬───────────────────────────┬────────────────────┘
+       │ own key: direct           │ Starter only               │ data (security rules)
+       ▼                           ▼                            ▼
+ LLM providers ◄──────── AI relay (Cloud Function)     Firebase Auth · Firestore ·
+ (Anthropic, OpenAI,       verify token · quota ·      Cloud Storage · Hosting
+  Gemini, Groq,            add platform key ·
+  OpenRouter, …)           stream through              onUserDeleted (Cloud Function)
 ```
+
+**What runs on the server — the complete list**
+
+| Piece | Type | Job |
+|---|---|---|
+| Firebase Auth | managed | Sign-in (Google, GitHub, email) |
+| Firestore + Storage | managed + security rules | Store projects, versions, images; rules allow each user only their own data |
+| Firebase Hosting | managed | Serve the Flutter app and landing page |
+| `aiRelay` | Cloud Function (TypeScript) | Starter requests only: verify token → check/count allowance → forward with our key → stream back |
+| `onUserDeleted` | Cloud Function (TypeScript) | Delete a user's projects and files when they delete their account |
+| Backups, file expiry, budget alerts | configuration | Scheduled Firestore export, Storage lifecycle rules, Google Cloud budget alerts |
+
+Everything else runs in the browser or the extension.
 
 ### Repository layout (monorepo)
 ```
 app/                      Flutter Web app
   lib/
     app/                  router, theme
-    core/                 api client (dio + SSE), auth, errors
+    core/                 auth, firebase, js bridges, workers, errors
     models/               generated from JSON Schema (see below)
     features/
       dashboard/
@@ -420,28 +478,29 @@ app/                      Flutter Web app
         versions/
       score/              portfolio score panel
       export/
-  web/                    index.html, monaco loader, bridge.js, renderer.js (built)
-packages/
+      settings/           AI access, keys (device-only), account
+  web/                    index.html, monaco loader, built JS packages, workers
+packages/                 TypeScript, bundled with esbuild for the browser
   schema/                 zod schemas: PortfolioContent, SiteSpec, DesignBrief,
                           Operation → exported as JSON Schema
-  renderer/               render(content, spec, custom) → files; section templates,
-                          variants, theme → CSS, behaviours JS; snapshot tests
-  checks/                 portfolio score rules (shared by browser + server)
-backend/
-  api/                    Fastify app, routes, auth middleware
-  llm/                    gateway, model registry, prompts, fallbacks
-  imports/                resume, github, orcid, rss
-  assets/                 sharp image pipeline, favicon, OG image
-  export/                 zip builder
-capture/                  Playwright capture + quality-check service
-evals/                    cross-model eval sets and runner
+  renderer/               render(content, spec, custom) → files; apply(op)
+  ai/                     gateway, model registry, prompts, fallbacks, transports
+  imports/                pdf/docx text extraction, GitHub, feed parsing
+  assets/                 image pipeline (worker), favicon, OG image
+  checks/                 portfolio score rules + axe runner
+  export/                 ZIP builder (worker)
+  keystore/               device-only encrypted key storage (WebCrypto + IndexedDB)
+extension/                Manifest V3 companion extension (TypeScript)
+functions/                Cloud Functions: aiRelay, onUserDeleted
+firebase/                 firestore.rules, storage.rules, indexes, lifecycle config
+evals/                    cross-model eval sets and runner (dev only)
 ```
 
 - **Single source of truth for types**: zod schemas in `packages/schema` → JSON Schema →
   Dart models generated with `quicktype` (+ `freezed`-style immutability). CI fails if
   generated code is stale.
-- **Renderer runs in the browser** (bundled with esbuild, called from Dart via
-  `dart:js_interop`) for instant preview, and on the server for export — identical output.
+- **Web Workers** run image encoding, PDF parsing, rendering of design thumbnails and
+  ZIP building, so the UI stays responsive on ordinary laptops.
 
 ---
 
@@ -449,16 +508,16 @@ evals/                    cross-model eval sets and runner
 
 ```
 users/{uid}               displayName, email, authProviders[],
-                          ai: { mode: starter|byo, simple: bool,
-                                smart: {keyId, provider, model}, fast: {...} },
-                          starterUsage: { month, generations, edits }
-secrets/{uid}/keys/{kid}  provider, label, last4, baseUrl?, encryptedKey, createdAt
-                          (backend-only; client rules deny all)
+                          ai: { mode: starter|own, simple: bool,
+                                smart: {provider, model}, fast: {...} }
+                          (keys are NOT stored here — they live only on the device)
+usage/{uid}               starter: { month, generations, edits }
+                          (written only by aiRelay; rules make it read-only for the client)
 projects/{pid}            ownerId, name, profileType, goals, status,
                           content: PortfolioContent      (≤ ~200 KB; large text in Storage)
                           spec: SiteSpec
                           custom: { css, js, sections: {id → {html, css, js}} }
-                          inspiration: [{source, brief, screenshotPaths}]
+                          inspiration: [{source, brief, screenshotPaths?}]
                           contactForm: { service, endpoint|id|link, fields[] }
                           aiOverride?: { smart, fast }
                           currentVersionId, score, updatedAt
@@ -494,13 +553,16 @@ SiteSpec {
 
 ## 7. Quality & testing
 - **Renderer**: snapshot tests for every section × variant × theme sample; Playwright
-  visual tests at 3 widths; axe-core accessibility tests — the library must pass before
+  visual tests in CI (development only, never in production) at 3 widths; axe-core accessibility tests — the library must pass before
   any AI is involved.
 - **Schema/operations**: unit tests that every operation validates and applies correctly.
-- **Backend**: route tests, SSRF guard tests, import parsers against fixture resumes,
-  ZIP structure tests.
+- **Browser packages**: import parsers against fixture resumes, image pipeline, ZIP
+  structure, keystore, gateway fallbacks with mocked providers.
+- **Server**: relay tests (token check, quota counting, caps, streaming) and
+  security-rules tests in the Firebase emulator.
+- **Extension**: capture against fixture pages; messaging only from the app's domain.
 - **Flutter**: unit tests for controllers, widget tests for wizard/editor panels,
-  integration test for intake → generate → edit → export with a mocked API.
+  integration test for intake → generate → edit → export with mocked providers.
 - **Cross-model evals** (`evals/`): ~30 sample resumes, ~15 reference sites, ~50 edit
   prompts. Scored on schema validity, factual fidelity (no invented facts), operation
   correctness, and rendered portfolio score. Run per supported model; a model is only
@@ -511,25 +573,30 @@ SiteSpec {
 ## 8. Authentication, security & privacy
 - **Sign-in required** before anything is created: Firebase Auth with Google, GitHub
   (also reused for the GitHub import), and email/password with mandatory email
-  verification. Backend verifies the Firebase ID token on every request.
+  verification. Firestore/Storage rules and the relay check the user's sign-in token.
 - Account page: change email/password, linked sign-in methods, delete account (removes
   projects, uploads, keys).
-- API keys: platform key in Secret Manager; BYO keys KMS-encrypted, server-only, never logged.
+- API keys: our Starter key lives only in Secret Manager, used by the relay. Users' own
+  keys stay on their device (encrypted, never uploaded). Because the browser holds the
+  key, the app ships a strict Content Security Policy, loads no third-party scripts,
+  and runs generated sites only in the sandboxed preview.
 - Firestore/Storage rules: owner-only access.
-- Uploads: type and size limits (resume ≤ 10 MB, images ≤ 15 MB), virus-scan optional,
-  EXIF stripped; users can delete their data and resume at any time.
+- Uploads: type and size limits (resume ≤ 10 MB, images ≤ 15 MB) checked in the browser
+  and enforced again by Storage rules; EXIF stripped before upload; users can delete
+  their data and resume at any time.
 - Preview iframe sandboxed (`allow-scripts`, no `allow-same-origin`); click-to-select
   uses `postMessage` with origin checks.
-- Capture service isolated: http/https only, DNS resolved and private/loopback/metadata
-  IPs blocked, timeouts, page-size limits, no cookies.
+- Extension: minimal permissions, per-site access requested at capture time, accepts
+  messages only from the app's domain, requests omit cookies, captures stay on the
+  device until the user sends them to their chosen AI model.
 - Inspiration is for style only; prompts forbid copying third-party text, images, or
   logos, and captured screenshots are never included in exports.
-- Per-user rate limits and AI usage quotas; usage logged per task and model.
+- Starter relay: per-user rate limits and monthly allowance; usage logged per model.
 - **Legal & privacy pages** before launch: privacy policy, terms of use, and an
   AI-processing notice naming which provider receives the user's data (differs for
-  Starter vs BYO key; free provider tiers may train on data).
-- **Data rights**: export all my data (JSON + assets ZIP), delete account; resumes can
-  be deleted after parsing ("keep original file" toggle, default on).
+  Starter vs own key; free provider tiers may train on data).
+- **Data rights**: export all my data (ZIP built in the browser), delete account. The
+  resume file is only uploaded if the user chooses to offer it as a download.
 - Prompt-injection hygiene: resume text, READMEs and reference pages are treated as
   data — wrapped and labelled in prompts; outputs are schema-validated operations, so
   injected instructions can't run arbitrary actions.
@@ -538,17 +605,18 @@ SiteSpec {
 
 ## 9. Operations
 - **Environments**: `dev` (emulators), `staging`, `prod` — separate Firebase projects.
-- **Hosting of the app itself**: Flutter Web on Firebase Hosting; API and capture
-  service on Cloud Run. A small static marketing/landing page (Flutter Web is poor
-  for SEO).
-- **Monitoring**: Sentry (Flutter + backend), Cloud Logging with structured logs,
-  uptime checks, alerts on error rate and AI spend.
+- **Hosting of the app itself**: Flutter Web on Firebase Hosting; two small Cloud
+  Functions. A small static marketing/landing page (Flutter Web is poor for SEO).
+- **Extension releases**: Chrome Web Store and Edge Add-ons (store review takes a few
+  days; plan releases ahead). The app works without the extension.
+- **Monitoring**: Sentry (app, extension, functions), Cloud Logging, alerts on relay
+  error rate and AI spend.
 - **Cost controls**: daily spend cap on the Starter key, budget alerts in Google Cloud,
-  per-user quotas, capture-service concurrency limit.
+  per-user quotas. Server cost stays near zero because processing runs on users' devices.
 - **Product analytics**: privacy-friendly events (signup, first site generated, export,
-  BYO key added) to measure the success metrics in §1.
-- **Admin tools (minimal)**: look up a user, reset Starter quota, disable abusive
-  accounts — protected admin route, not a full back office.
+  own key added) to measure the success metrics in §1.
+- **Admin tools**: the Firebase console (look up a user, disable an account, edit the
+  usage document to reset a Starter allowance); no custom back office in MVP.
 - **Backups**: scheduled Firestore export; Storage versioning on project files.
 
 ---
@@ -557,17 +625,17 @@ SiteSpec {
 
 | Phase | Deliverable | Est. |
 |---|---|---|
-| **0. Foundations** | Monorepo, CI (lint, typecheck, tests), Firebase project, Fastify skeleton, Flutter shell with **required sign-in** (Google, GitHub, email) + dashboard, schema package + Dart codegen | 1 wk |
+| **0. Foundations** | Monorepo, CI (lint, typecheck, tests), Firebase project + security rules, Functions skeleton, Flutter shell with **required sign-in** (Google, GitHub, email) + dashboard, schema package + Dart codegen, JS-interop + Web Worker plumbing | 1 wk |
 | **1. Renderer & library** *(no AI)* | Theme system, ~12 section types × 2–3 variants, behaviours JS, case-study pages, renderer tests; a dev page that renders sample content | 2.5 wk |
-| **2. Intake & content** | Profile types, wizard, content forms, image upload + asset pipeline, **LLM gateway + model registry + fallbacks**, **Settings → AI (starter allowance, BYO key, model picker)**, resume parsing, GitHub import | 2.5 wk |
-| **3. Design generation** | Capture service, inspiration briefs with mix-and-match, curated style gallery, 3 design directions | 1.5 wk |
-| **4. Editor workspace** | Preview with device widths, sections/theme/content panels, inline text editing, Monaco code mode with custom sections, contact-form service setup, versions, **ZIP export** | 2.5 wk |
+| **2. Intake & content** | Profile types, wizard, content forms, in-browser image pipeline, **client AI gateway + model registry + fallbacks**, **Starter relay**, **Settings → AI (device-only keys, Sign in with OpenRouter, model picker)**, in-browser resume parsing, GitHub import | 2.5 wk |
+| **3. Design generation** | **Companion extension** (capture, RSS, store listing), screenshot-upload fallback, inspiration briefs with mix-and-match, curated style gallery, 3 design directions | 2.5 wk |
+| **4. Editor workspace** | Preview with device widths, sections/theme/content panels, inline text editing, Monaco code mode with custom sections, contact-form service setup, versions, **in-browser ZIP export** | 2.5 wk |
 | **5. AI assistant** | Prompt → operations, change summary + diff, click-to-select, regenerate section/design, custom section generation, content assistant (rewrite, tagline, case-study interview) | 2 wk |
 | **6. Score & polish** | Portfolio score + auto-fixes, onboarding polish, quotas, error states | 1.5 wk |
 | **7. Multi-model hardening** | Cross-model eval runs (incl. free-tier models), prompt tuning per tier, recommended-model labels, usage dashboard | 1 wk |
 
-**MVP = Phases 0–6 (~13.5 weeks for one developer).** Phase 7 can run in parallel once
-Phase 5 lands. Later items are listed in §3.10.
+**MVP = Phases 0–6 (~14.5 weeks for one developer).** Phase 7 can run in parallel once
+Phase 5 lands. Later items are listed in §3.11.
 
 **First milestone worth demoing:** end of Phase 2 — upload a resume, get a rendered
 portfolio from the library with a default theme, no design AI yet.
@@ -575,15 +643,23 @@ portfolio from the library with a default theme, no design AI yet.
 ---
 
 ## 11. Decisions log & remaining questions
-**Decided:** ZIP export · plain HTML/CSS/JS · TypeScript backend · Flutter Web ·
-model-agnostic AI · BYO key + model picker · free Starter allowance · sign-in required ·
-contact forms via external form service · full MVP scope (Phases 0–6) · 4 profile types ·
-no payments · English UI with any LTR content language.
+**Decided:** ZIP export · plain HTML/CSS/JS · Flutter Web · thin server (TypeScript
+Cloud Functions) with all processing in the browser · model-agnostic AI · own key stored
+on device only, called directly from the browser · Sign in with OpenRouter · free Starter
+allowance through a relay · companion browser extension for reference sites ·
+sign-in required · contact forms via external form service · full MVP scope (Phases 0–6) ·
+4 profile types · no payments · English UI with any LTR content language.
+
+**Ruled out:** driving ChatGPT/Claude/Gemini chat websites inside the app (blocked by
+browsers in a web app, against those services' terms, and brittle); Playwright inside
+the web app (a web page can't control a browser, WASM or not).
 
 **Still open (decide during Phase 2, not blocking):**
 1. Starter allowance size and which low-cost model backs it.
 2. Which free-tier providers to feature in the "get a free key" guide (verify their
    current limits and data-use terms at that time).
+3. Confirm each provider still allows browser calls (CORS) during Phase 2; any that
+   don't are left out of the own-key list.
 
 ---
 
@@ -598,11 +674,13 @@ no payments · English UI with any LTR content language.
 - Portfolio content is the user's own; the AI never invents facts.
 
 **Technical**
-- Firebase (Auth, Firestore, Storage, Hosting) on Google Cloud, with Cloud Run for the
-  API and capture service.
-- Vercel AI SDK behind our own gateway interface for multi-provider support.
-- Monaco as the code editor inside Flutter Web; the renderer is a shared TypeScript
-  package run in both the browser and the server.
+- Firebase (Auth, Firestore, Storage, Hosting) on Google Cloud, with two small Cloud
+  Functions as the only server code.
+- Vercel AI SDK, running in the browser, behind our own gateway interface.
+- Monaco as the code editor inside Flutter Web; renderer, AI gateway, imports, image
+  processing, checks and export are TypeScript packages running in the browser.
+- Users have an ordinary modern laptop/desktop; heavy steps run in Web Workers.
+- Extension supports Chrome and Edge at launch; Firefox/Safari users use screenshot upload.
 - Fonts and icons are bundled into the ZIP; no third-party requests from exported sites
   except the user's chosen form service.
 - App supports the last 2 versions of Chrome, Edge, Firefox and Safari.
@@ -610,6 +688,7 @@ no payments · English UI with any LTR content language.
 **Business & team**
 - One full-time developer (estimates scale down with more people; Phases 1 and 2 can
   run in parallel with two).
-- You pay the Starter AI cost (small; capped daily) and Google Cloud hosting.
+- You pay the Starter AI cost (small; capped daily), Google Cloud hosting (near zero at
+  MVP scale), and a one-time Chrome Web Store developer fee.
 - Privacy policy and terms are written before public launch (templates + review).
 - Launch region is global; GDPR-style data export/delete is built in from day one.
