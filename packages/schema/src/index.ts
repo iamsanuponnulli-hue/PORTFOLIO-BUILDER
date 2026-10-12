@@ -4,5 +4,4 @@ export * from './content.ts';
 export * from './spec.ts';
 export * from './project.ts';
 export * from './user.ts';
-export * from './relay.ts';
 export * from './operations.ts';

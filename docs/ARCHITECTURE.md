@@ -8,11 +8,10 @@ for every major user action.
 
 ## 1. Guiding principles
 
-1. **Thin server, heavy browser.** All processing runs on the user's computer: AI calls
-   with their own key, resume parsing, image processing, rendering, quality checks and
-   ZIP export. The server only does what a browser can't do safely: sign-in, storing
-   data behind security rules, relaying Starter AI requests (our key must stay secret),
-   and cleaning up deleted accounts.
+1. **No server code, zero cost.** All processing runs on the user's computer: AI calls
+   with their own key, resume parsing, image processing, rendering, quality checks,
+   ZIP export and account cleanup. The only server is Firebase's free Spark plan:
+   sign-in, the Firestore database behind security rules, and hosting.
 2. **Everything is an operation.** Every change — typing in a form, inline text edit,
    dragging a section, a theme slider, saving code, an AI prompt — becomes a typed
    `Operation` applied by one reducer. One undo stack, one autosave, one version
@@ -47,17 +46,16 @@ flowchart LR
     EXT["Companion extension<br/>Chrome / Edge"]
   end
 
-  subgraph FB["Firebase / Google Cloud"]
+  subgraph FB["Firebase Spark plan (free)"]
     AUTH["Auth"]
     FS[("Firestore")]
-    ST[("Storage")]
-    RELAY["aiRelay<br/>Cloud Function"]
-    DEL["onUserDeleted<br/>Cloud Function"]
+    HOST["Hosting"]
   end
 
-  LLM["LLM providers<br/>Anthropic · OpenAI · Gemini ·<br/>Groq · OpenRouter · …"]
+  LLM["LLM providers<br/>Gemini · Groq · OpenRouter ·<br/>Anthropic · OpenAI · …"]
   GH["GitHub API"]
   REF["Reference sites,<br/>RSS feeds"]
+  IDB[("IndexedDB<br/>keys · images · resume ·<br/>unsynced edits")]
 
   FA <--> TS
   TS <--> WK
@@ -67,13 +65,10 @@ flowchart LR
   EXT --> REF
   FA --> AUTH
   FA -- security rules --> FS
-  FA -- security rules --> ST
-  AI -- own key: direct --> LLM
-  AI -- Starter --> RELAY --> LLM
+  HOST -. serves .-> FA
+  TS <--> IDB
+  AI -- user's own key, direct --> LLM
   IM --> GH
-  AUTH -. account deleted .-> DEL
-  DEL --> FS
-  DEL --> ST
 ```
 
 ### What runs where
@@ -82,28 +77,26 @@ flowchart LR
 |---|---|---|
 | **Browser** | Flutter app | UI, routing, editor state, operations reducer, undo/redo, autosave |
 | | renderer | `render(content, spec, custom) → files`, `apply(state, op)` |
-| | ai gateway | Prompts, model registry, capability fallbacks, validation + repair retry, direct or relay transport |
+| | ai gateway | Prompts, model registry, capability fallbacks, validation + repair retry; calls the provider directly with the user's key |
 | | imports | PDF/DOCX text extraction (pdf.js, mammoth), GitHub API, feed parsing |
 | | assets | Resize, WebP encode, EXIF strip, crop, favicon, OG image |
 | | checks | Instant checks on every render; axe-core + 3 widths before export |
 | | export | Build the ZIP and download it |
 | | keystore | Encrypt/store own API keys in IndexedDB (never uploaded) |
+| | localstore | Images and resume in IndexedDB, unsynced edits, project backup files |
+| | account cleanup | Deletes the user's projects and data, then the account |
 | | Web Workers | Run image, PDF, ZIP and thumbnail rendering off the UI thread |
 | **Extension** | capture | Open reference site, screenshots at 2 widths, computed styles |
 | | fetch | RSS feeds, external link checks |
 | **Server** | Firebase Auth | Sign-in |
-| | Firestore / Storage | Data, protected by owner-only security rules |
-| | `aiRelay` | Starter only: verify token → check/count allowance → add our key → stream through |
-| | `onUserDeleted` | Delete a deleted user's data |
-| | Configuration only | Backups, file expiry, budget alerts |
+| | Firestore | Projects, content text, design, history; owner-only security rules |
+| | Hosting | Serves the app |
 
-Why each server piece can't move to the browser:
-- **Auth / database / storage** — data has to live somewhere shared and be protected
-  from other users; the browser can't enforce that on its own.
-- **aiRelay** — the Starter allowance uses *our* API key. Anything sent to a browser can
-  be read, so the key must stay on a server. The relay only forwards and waits.
-- **onUserDeleted** — the account may be gone before the browser finishes cleaning up,
-  so cleanup must be guaranteed server-side.
+There is no server code. Sign-in and the database can't move to the browser: data has
+to live somewhere shared and be protected from other users. Everything else does run
+in the browser. A paid "Starter" AI relay, server-side cleanup and cloud image storage
+would each need Firebase's paid Blaze plan; they're listed in PLAN.md §13 as optional
+later upgrades.
 
 ---
 
@@ -114,7 +107,7 @@ flowchart TB
   PG["Pages & widgets"] -- intents --> CT["Riverpod controllers<br/>Auth · Dashboard · Intake ·<br/>Editor · Assistant · Settings"]
   CT -- state --> PG
   CT --> RP["Repositories<br/>Project · AI · Import · Keys · Export"]
-  RP --> FBS["Firebase SDKs<br/>(Auth, Firestore, Storage)"]
+  RP --> FBS["Firebase SDKs<br/>(Auth, Firestore)"]
   RP --> BR["JS bridges<br/>renderer · ai · imports · assets ·<br/>checks · export · keystore ·<br/>Monaco · Preview · Extension"]
   BR --> WK["Web Workers"]
 ```
@@ -154,19 +147,15 @@ EditorState {
 }
 ```
 
-### Server code (all of it)
+### Saving (local-first, inside the free allowance)
 
 ```mermaid
 flowchart LR
-  subgraph relay["aiRelay (HTTP, streaming)"]
-    A1["Verify Firebase ID token"] --> A2["Check request: Starter model,<br/>input size, max output tokens"]
-    A2 --> A3["Firestore transaction:<br/>allowance left? count it"]
-    A3 --> A4["Forward to provider<br/>with our key"]
-    A4 --> A5["Stream response back"]
-  end
-  subgraph del["onUserDeleted (Auth trigger)"]
-    D1["Delete projects, versions,<br/>usage doc"] --> D2["Delete Storage folder"]
-  end
+  OP["Operation applied"] --> IDB["IndexedDB<br/>saved instantly"]
+  IDB --> T{"30 s since last sync,<br/>or tab hidden/closed?"}
+  T -- yes --> FS["Firestore write<br/>(revision + 1)"]
+  T -- no --> W["wait"]
+  FS -- "daily write allowance used" --> Q["keep local, retry tomorrow,<br/>tell the user"]
 ```
 
 ---
@@ -220,7 +209,7 @@ flowchart LR
 **Dashboard**
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ ◆ Portfolio Builder                          AI: Starter 2/3  ⚙  (avatar) │
+│ ◆ Portfolio Builder                        AI: Gemini (free)  ⚙  (avatar) │
 ├──────────────────────────────────────────────────────────────────────────┤
 │ Your portfolios                                         [ + New portfolio ]│
 │ ┌────────────┐ ┌────────────┐ ┌────────────┐                              │
@@ -246,7 +235,7 @@ flowchart LR
 │  ┌──────────────────────────────┐  ┌──────────────────────────────┐       │
 │  │  LinkedIn: how to export PDF │  │  Blog feed URL (via extension)│       │
 │  └──────────────────────────────┘  └──────────────────────────────┘       │
-│  ⓘ Resume text is sent to: your Anthropic key (direct). Change in Settings│
+│  ⓘ Resume text is sent to: Gemini, with your key. Change in Settings      │
 │                                              [ Skip ]  [ Continue → ]     │
 └──────────────────────────────────────────────────────────────────────────┘
 ```
@@ -319,12 +308,11 @@ flowchart LR
 **Settings → AI**
 ```
 ┌──────────────────────────────────────────────────────────────────────────┐
-│ AI access   ( ) Starter — 2 of 3 generations, 31 of 50 edits left (Oct)   │
-│             (•) My own keys — stored on this device only, never uploaded  │
-│ Keys        Anthropic  ••••7Hk2  [Test] [Replace] [Delete]                │
+│ AI access   Your own keys — stored on this device only, never uploaded     │
+│ Keys        Google Gemini  ••••7Hk2  free tier  [Test] [Replace] [Delete]  │
 │             [+ Add key]  [Sign in with OpenRouter]                        │
 │             Free key guides: Gemini · Groq · OpenRouter                   │
-│ Model       Simple: one model [ claude-… ▾ ]  ✓Recommended 📄 👁 { }       │
+│ Model       Simple: one model [ gemini-…-flash ▾ ] ✓Recommended 📄 👁 { }  │
 │             ( ) Advanced: Smart [ … ▾ ]  Fast [ … ▾ ]                     │
 │ ⓘ This model can't read images — inspiration will use page styles only.  │
 └──────────────────────────────────────────────────────────────────────────┘
@@ -352,7 +340,6 @@ sequenceDiagram
     end
   end
   App->>FS: read users/{uid} (create on first sign-in; rules: owner only)
-  App->>FS: read usage/{uid} (read-only for client)
   App-->>U: target route (default Dashboard)
 ```
 
@@ -363,7 +350,7 @@ sequenceDiagram
   participant App
   participant W as Worker (imports)
   participant GW as ai gateway (browser)
-  participant P as Provider or relay
+  participant P as Provider (user's key)
   U->>App: drop resume.pdf
   App->>App: check type and size
   App->>W: extract text (pdf.js / mammoth)
@@ -376,7 +363,7 @@ sequenceDiagram
   else scanned and no vision model
     App-->>U: "Couldn't read this file" → manual entry or pick a vision model
   end
-  GW->>P: request (direct with own key, or Starter relay)
+  GW->>P: request with the user's key, straight from the browser
   P-->>GW: JSON
   GW->>GW: validate with zod, repair retry once if invalid
   GW-->>App: PortfolioContent (partial) + warnings
@@ -414,7 +401,7 @@ sequenceDiagram
   actor U as User
   participant App
   participant GW as ai gateway (browser)
-  participant P as Provider or relay
+  participant P as Provider (user's key)
   participant W as Worker (renderer)
   participant FS as Firestore
   U->>App: Generate
@@ -475,7 +462,7 @@ sequenceDiagram
   actor U as User
   participant AS as AssistantController
   participant GW as ai gateway (browser)
-  participant P as Provider or relay
+  participant P as Provider (user's key)
   participant EC as EditorController
   U->>AS: "Add testimonials under projects and make it warmer"
   AS->>GW: assistant.edit (prompt, spec, selection, relevant content/code, recent chat)
@@ -495,25 +482,19 @@ sequenceDiagram
 ### 6.8 Routing every AI request
 ```mermaid
 flowchart TD
-  A["AI task (browser)"] --> B{"AI mode"}
-  B -- Own key --> E["Load key from device keystore<br/>pick Smart or Fast model"]
+  A["AI task (browser)"] --> K{"Key on this device?"}
+  K -- no --> C["'Connect a free AI' screen:<br/>Sign in with OpenRouter,<br/>free Gemini/Groq key guide,<br/>or skip and fill in by hand"]
+  K -- yes --> E["Load key from keystore,<br/>pick Smart or Fast model"]
   E --> F{"Capabilities fit task?"}
-  B -- Starter --> D["Starter model via relay"]
-  D --> F
   F -- no --> G["Fallback: text extraction,<br/>JSON mode, no vision…"]
-  F -- yes --> H{"Transport"}
+  F -- yes --> H["Browser → provider directly"]
   G --> H
-  H -- own key --> H1["Browser → provider directly"]
-  H -- Starter --> H2["Browser → aiRelay → provider"]
-  H2 --> Q{"Allowance left?"}
-  Q -- no --> Q1["'Allowance used' → offer own key"]
-  H1 --> I{"Response"}
-  Q -- yes --> I
+  H --> I{"Response"}
   I -- ok --> J["Validate (zod) → repair once if invalid"]
-  J --> M["Return + record usage"]
+  J --> M["Return + record usage on this device"]
   I -- 401/403 --> N["'Key invalid' → Settings"]
-  I -- 429 --> O["'Rate limited, retry in N s'"]
-  I -- no credit --> P["'Out of credit' → switch model / Starter"]
+  I -- 429 --> O["'Free-tier limit reached, retry in N s'<br/>or pick another model"]
+  I -- no credit --> P["'Out of credit' → pick another model"]
 ```
 
 ### 6.9 Add a key or sign in with OpenRouter
@@ -524,7 +505,7 @@ sequenceDiagram
   participant KS as keystore (browser)
   participant P as Provider
   participant OR as OpenRouter
-  alt paste a key
+  alt paste a key (guided: free Gemini or Groq key)
     U->>App: provider + key (+ base URL)
     App->>P: list models (validation, direct from browser)
     P-->>App: models
@@ -554,22 +535,24 @@ sequenceDiagram
   App-->>U: download + score summary with fixes
 ```
 
-### 6.11 Starter relay (server)
+### 6.11 Delete account (in the app, no server code)
 ```mermaid
 sequenceDiagram
-  participant GW as ai gateway (browser)
-  participant R as aiRelay
+  actor U as User
+  participant App
   participant FS as Firestore
-  participant P as Provider
-  GW->>R: POST request + ID token
-  R->>R: verify token · Starter model only · size and token caps · rate limit
-  R->>FS: transaction on usage/{uid}: allowance left? increment
-  alt allowance used
-    R-->>GW: 402 allowance used
-  else
-    R->>P: forward with our key (Secret Manager)
-    P-->>R: stream
-    R-->>GW: stream through
+  participant A as Firebase Auth
+  U->>App: Delete account → confirm
+  App->>A: when did this sign-in happen?
+  alt more than 5 minutes ago
+    App-->>U: "Sign out, sign in again, then delete" (nothing deleted)
+  else recent
+    loop each project
+      App->>FS: delete versions, then project + counter (transaction)
+    end
+    App->>FS: delete users/{uid}
+    App->>App: clear this device's keys, images and drafts
+    App->>A: delete the account
   end
 ```
 
@@ -625,9 +608,12 @@ function render(state: SiteState): { files: SiteFiles; checks: CheckResult[] };
 | `keys.save/list/remove/get(provider)` | keystore |
 | `ext.ping()`, `ext.capture(url)`, `ext.fetchFeed(url)`, `ext.checkLinks(urls)` | extension bridge |
 
+
 ### Server surface (complete)
-| Endpoint / trigger | Purpose |
+| Piece | Purpose |
 |---|---|
-| `POST /aiRelay` (streaming) | Starter AI requests only |
-| Auth `onDelete` → `onUserDeleted` | Remove the user's data |
-| Firestore / Storage security rules | Owner-only access; `usage/{uid}` read-only for clients |
+| Firebase Auth | Sign-in |
+| Firestore security rules | Owner-only access to users, projects and versions |
+| Firebase Hosting | Serves the app |
+
+No endpoints or functions of our own.

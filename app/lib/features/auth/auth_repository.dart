@@ -51,9 +51,6 @@ class AuthRepository {
   }
 
   Future<void> signOut() => _auth.signOut();
-
-  /// Deletes the account. The server function then removes all of its data.
-  Future<void> deleteAccount() async => _auth.currentUser?.delete();
 }
 
 /// Email/password accounts must verify their email; Google and GitHub accounts don't.

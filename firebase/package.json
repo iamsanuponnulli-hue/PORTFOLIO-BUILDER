@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:emulator": "firebase emulators:exec --only firestore,storage --project demo-portfolio-builder --config ../firebase.json \"vitest run\"",
+    "test:emulator": "firebase emulators:exec --only firestore --project demo-portfolio-builder --config ../firebase.json \"vitest run\"",
     "typecheck": "tsc --noEmit"
   },
   "devDependencies": {

@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
 import '../../core/ui/feedback.dart';
+import '../account/account_service.dart';
 import '../auth/auth_repository.dart';
 
 class SettingsPage extends ConsumerWidget {
@@ -18,7 +19,9 @@ class SettingsPage extends ConsumerWidget {
     );
     if (!ok) return;
     try {
-      await ref.read(authRepositoryProvider).deleteAccount();
+      await ref.read(accountServiceProvider).deleteAccount();
+    } on RecentSignInRequired catch (e) {
+      if (context.mounted) showMessage(context, e.toString());
     } catch (e) {
       if (context.mounted) showMessage(context, authErrorMessage(e));
     }
@@ -51,10 +54,11 @@ class SettingsPage extends ConsumerWidget {
                     children: [
                       ListTile(
                         leading: const Icon(Icons.auto_awesome_outlined),
-                        title: const Text('Starter allowance'),
+                        title: const Text('Your AI key'),
                         subtitle: Text(
-                          'Choosing a model, adding your own key (kept on this device only) '
-                          'and signing in with OpenRouter arrive in the next phase.',
+                          'This app has no paid AI of its own: AI features use your own key, '
+                          'kept on this device only and never uploaded. Free keys from Gemini, '
+                          'Groq or OpenRouter work. Setting this up arrives in the next phase.',
                           style: theme.textTheme.bodySmall,
                         ),
                       ),

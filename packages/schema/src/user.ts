@@ -7,9 +7,12 @@ export const ModelChoice = z
   })
   .meta({ id: 'ModelChoice' });
 
+/**
+ * Which models to use. Keys themselves never leave the user's device: the app has no
+ * paid AI of its own, so every AI call uses the user's own (often free) provider key.
+ */
 export const AiSettings = z
   .object({
-    mode: z.enum(['starter', 'own']).default('starter'),
     simple: z.boolean().default(true),
     smart: ModelChoice.nullish(),
     fast: ModelChoice.nullish(),
@@ -27,13 +30,3 @@ export const UserDoc = z
   })
   .meta({ id: 'UserDoc' });
 export type UserDoc = z.infer<typeof UserDoc>;
-
-/** usage/{uid} — written only by the aiRelay function. */
-export const UsageDoc = z
-  .object({
-    month: z.string().regex(/^\d{4}-\d{2}$/),
-    generations: z.number().int().min(0),
-    edits: z.number().int().min(0),
-  })
-  .meta({ id: 'UsageDoc' });
-export type UsageDoc = z.infer<typeof UsageDoc>;

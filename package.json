@@ -14,7 +14,7 @@
     "format": "prettier --write .",
     "codegen": "pnpm --filter @pb/schema run codegen",
     "bridge": "pnpm --filter @pb/bridge run build",
-    "emulators": "firebase emulators:start --only auth,firestore,storage,functions --project demo-portfolio-builder"
+    "emulators": "firebase emulators:start --only auth,firestore,hosting --project demo-portfolio-builder"
   },
   "devDependencies": {
     "@eslint/js": "^9.39.0",

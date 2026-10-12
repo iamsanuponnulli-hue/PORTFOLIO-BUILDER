@@ -1,14 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import {
-  LIMITS,
-  Operation,
-  PortfolioContent,
-  ProjectDoc,
-  RelayRequest,
-  UserDoc,
-} from '../src/index.ts';
+import { LIMITS, Operation, PortfolioContent, ProjectDoc, UserDoc } from '../src/index.ts';
 
 describe('defaults', () => {
   it('builds an empty portfolio from nothing', () => {
@@ -57,9 +50,9 @@ describe('defaults', () => {
     expect(r.success).toBe(false);
   });
 
-  it('defaults AI mode to starter and never has a key field', () => {
+  it('never stores an API key in the user document', () => {
     const u = UserDoc.parse({ createdAt: 1 });
-    expect(u.ai.mode).toBe('starter');
+    expect(u.ai).toEqual({ simple: true });
     expect(JSON.stringify(u)).not.toMatch(/key/i);
   });
 });
@@ -80,14 +73,6 @@ describe('patch operations', () => {
     expect(op).toEqual({ op: 'setSeo', seo: { title: 'x' } });
     const cf = Operation.parse({ op: 'setContactForm', contactForm: { value: 'f/1' } });
     expect(cf).toEqual({ op: 'setContactForm', contactForm: { value: 'f/1' } });
-  });
-});
-
-describe('relay request', () => {
-  it('requires at least one message', () => {
-    expect(
-      RelayRequest.safeParse({ kind: 'edit', messages: [], maxOutputTokens: 10 }).success,
-    ).toBe(false);
   });
 });
 

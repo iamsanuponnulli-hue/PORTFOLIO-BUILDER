@@ -12,7 +12,6 @@ import {
   ContactForm,
   PortfolioContent,
   ProjectDoc,
-  UsageDoc,
   UserDoc,
 } from '../src/index.ts';
 
@@ -20,7 +19,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const outDir = resolve(here, '../generated');
 mkdirSync(outDir, { recursive: true });
 
-const roots = z.object({ projectDoc: ProjectDoc, userDoc: UserDoc, usageDoc: UsageDoc });
+const roots = z.object({ projectDoc: ProjectDoc, userDoc: UserDoc });
 const schema = {
   title: 'PortfolioBuilderModels',
   ...z.toJSONSchema(roots, { io: 'output', unrepresentable: 'any', target: 'draft-7' }),

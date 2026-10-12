@@ -28,10 +28,9 @@ jobs:
         run: |
           pnpm codegen
           git diff --exit-code -- app/lib/models/generated app/assets/schema packages/schema/generated
-      - run: pnpm --filter @pb/functions run build
 
   emulator:
-    name: Security rules and quota (Firebase emulators)
+    name: Security rules (Firebase emulator)
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4

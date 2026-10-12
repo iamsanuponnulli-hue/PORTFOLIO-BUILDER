@@ -12,35 +12,29 @@ String portfolioBuilderModelsToJson(PortfolioBuilderModels data) => json.encode(
 
 class PortfolioBuilderModels {
     final ProjectDoc projectDoc;
-    final UsageDoc usageDoc;
     final UserDoc userDoc;
 
     PortfolioBuilderModels({
         required this.projectDoc,
-        required this.usageDoc,
         required this.userDoc,
     });
 
     PortfolioBuilderModels copyWith({
         ProjectDoc? projectDoc,
-        UsageDoc? usageDoc,
         UserDoc? userDoc,
     }) => 
         PortfolioBuilderModels(
             projectDoc: projectDoc ?? this.projectDoc,
-            usageDoc: usageDoc ?? this.usageDoc,
             userDoc: userDoc ?? this.userDoc,
         );
 
     factory PortfolioBuilderModels.fromJson(Map<String, dynamic> json) => PortfolioBuilderModels(
         projectDoc: ProjectDoc.fromJson(json["projectDoc"]),
-        usageDoc: UsageDoc.fromJson(json["usageDoc"]),
         userDoc: UserDoc.fromJson(json["userDoc"]),
     );
 
     Map<String, dynamic> toJson() => {
         "projectDoc": projectDoc.toJson(),
-        "usageDoc": usageDoc.toJson(),
         "userDoc": userDoc.toJson(),
     };
 }
@@ -1386,41 +1380,6 @@ final projectStatusValues = EnumValues({
     "generating": ProjectStatus.GENERATING
 });
 
-class UsageDoc {
-    final int edits;
-    final int generations;
-    final String month;
-
-    UsageDoc({
-        required this.edits,
-        required this.generations,
-        required this.month,
-    });
-
-    UsageDoc copyWith({
-        int? edits,
-        int? generations,
-        String? month,
-    }) => 
-        UsageDoc(
-            edits: edits ?? this.edits,
-            generations: generations ?? this.generations,
-            month: month ?? this.month,
-        );
-
-    factory UsageDoc.fromJson(Map<String, dynamic> json) => UsageDoc(
-        edits: json["edits"],
-        generations: json["generations"],
-        month: json["month"],
-    );
-
-    Map<String, dynamic> toJson() => {
-        "edits": edits,
-        "generations": generations,
-        "month": month,
-    };
-}
-
 class UserDoc {
     final AiSettings ai;
     final int createdAt;
@@ -1470,40 +1429,34 @@ class UserDoc {
 
 class AiSettings {
     final ModelChoice? fast;
-    final Mode mode;
     final bool simple;
     final ModelChoice? smart;
 
     AiSettings({
         this.fast,
-        required this.mode,
         required this.simple,
         this.smart,
     });
 
     AiSettings copyWith({
         ModelChoice? fast,
-        Mode? mode,
         bool? simple,
         ModelChoice? smart,
     }) => 
         AiSettings(
             fast: fast ?? this.fast,
-            mode: mode ?? this.mode,
             simple: simple ?? this.simple,
             smart: smart ?? this.smart,
         );
 
     factory AiSettings.fromJson(Map<String, dynamic> json) => AiSettings(
         fast: json["fast"] == null ? null : ModelChoice.fromJson(json["fast"]),
-        mode: modeValues.map[json["mode"]]!,
         simple: json["simple"],
         smart: json["smart"] == null ? null : ModelChoice.fromJson(json["smart"]),
     );
 
     Map<String, dynamic> toJson() => {
         "fast": fast?.toJson(),
-        "mode": modeValues.reverse[mode],
         "simple": simple,
         "smart": smart?.toJson(),
     };
@@ -1537,16 +1490,6 @@ class ModelChoice {
         "provider": provider,
     };
 }
-
-enum Mode {
-    OWN,
-    STARTER
-}
-
-final modeValues = EnumValues({
-    "own": Mode.OWN,
-    "starter": Mode.STARTER
-});
 
 class EnumValues<T> {
     Map<String, T> map;

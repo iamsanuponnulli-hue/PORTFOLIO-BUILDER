@@ -27,7 +27,7 @@ const bob = () => env.authenticatedContext('bob', verified).firestore();
 const userDoc = (projectCount = 0) => ({
   displayName: 'Alice',
   email: 'alice@example.com',
-  ai: { mode: 'starter', simple: true },
+  ai: { simple: true },
   projectCount,
   createdAt: 1,
 });
@@ -67,20 +67,14 @@ describe('users', () => {
   it('blocks unknown fields such as API keys', async () => {
     await assertFails(setDoc(doc(alice(), 'users/alice'), { ...userDoc(), apiKey: 'sk-123' }));
   });
+  it("lets a user delete their own doc but not someone else's", async () => {
+    await seed({ 'users/alice': userDoc(), 'users/bob': { ...userDoc(), displayName: 'Bob' } });
+    await assertFails(deleteDoc(doc(alice(), 'users/bob')));
+    await assertSucceeds(deleteDoc(doc(alice(), 'users/alice')));
+  });
   it('blocks setting projectCount out of range', async () => {
     await seed({ 'users/alice': userDoc() });
     await assertFails(updateDoc(doc(alice(), 'users/alice'), { projectCount: 3 }));
-  });
-});
-
-describe('usage', () => {
-  it('is readable by its owner but never writable by clients', async () => {
-    await seed({ 'usage/alice': { month: '2026-10', generations: 1, edits: 2 } });
-    await assertSucceeds(getDoc(doc(alice(), 'usage/alice')));
-    await assertFails(
-      setDoc(doc(alice(), 'usage/alice'), { month: '2026-10', generations: 0, edits: 0 }),
-    );
-    await assertFails(getDoc(doc(bob(), 'usage/alice')));
   });
 });
 

@@ -22,7 +22,7 @@ class UserRepository {
     final snap = await ref.get();
     if (snap.exists) return;
     final doc = UserDoc(
-      ai: AiSettings(mode: Mode.STARTER, simple: true),
+      ai: AiSettings(simple: true),
       createdAt: _clock().millisecondsSinceEpoch,
       displayName: displayName ?? '',
       email: email ?? '',
@@ -30,6 +30,8 @@ class UserRepository {
     );
     await ref.set(_withoutNulls(doc.toJson()));
   }
+
+  Future<void> delete(String uid) => _ref(uid).delete();
 
   Stream<UserDoc?> watch(String uid) => _ref(uid).snapshots().map(
     (s) => s.exists && s.data() != null ? UserDoc.fromJson(s.data()!) : null,

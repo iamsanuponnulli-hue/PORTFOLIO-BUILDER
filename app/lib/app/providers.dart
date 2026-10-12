@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../core/js/pb_bridge.dart';
 import '../core/templates.dart';
+import '../features/account/account_service.dart';
 import '../features/account/user_repository.dart';
 import '../features/auth/auth_repository.dart';
 import '../features/dashboard/project_repository.dart';
@@ -31,6 +32,14 @@ final projectRepositoryProvider = Provider<ProjectRepository>(
   (ref) => ProjectRepository(
     ref.watch(firestoreProvider),
     ref.watch(templatesProvider),
+  ),
+);
+
+final accountServiceProvider = Provider<AccountService>(
+  (ref) => AccountService(
+    ref.watch(firebaseAuthProvider),
+    ref.watch(userRepositoryProvider),
+    ref.watch(projectRepositoryProvider),
   ),
 );
 

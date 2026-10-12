@@ -35,13 +35,8 @@ service cloud.firestore {
         && (request.resource.data.projectCount == resource.data.projectCount
             || request.resource.data.projectCount == resource.data.projectCount + 1
             || request.resource.data.projectCount == resource.data.projectCount - 1);
-      allow delete: if false;
-    }
-
-    // ---- usage/{uid}: written only by the aiRelay function (Admin SDK) ------
-    match /usage/{uid} {
-      allow read: if isUser(uid);
-      allow write: if false;
+      // The app deletes the user's projects first, then this document, then the account.
+      allow delete: if isUser(uid);
     }
 
     // ---- projects/{pid} ----------------------------------------------------

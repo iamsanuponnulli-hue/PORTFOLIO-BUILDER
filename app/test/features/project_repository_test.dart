@@ -24,10 +24,10 @@ void main() {
     ).ensure(uid: 'alice', displayName: 'Alice', email: 'a@example.com');
   });
 
-  test('user doc is created once with Starter AI and no keys', () async {
+  test('user doc is created once with no API keys', () async {
     final data = (await db.doc('users/alice').get()).data()!;
     expect(data['projectCount'], 0);
-    expect(data['ai'], {'mode': 'starter', 'simple': true});
+    expect(data['ai'], {'simple': true});
     await UserRepository(db).ensure(uid: 'alice');
     expect((await db.doc('users/alice').get()).data()!['displayName'], 'Alice');
   });

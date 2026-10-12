@@ -10,7 +10,6 @@ const _options = FirebaseOptions(
   messagingSenderId: Env.firebaseSenderId,
   projectId: Env.firebaseProjectId,
   authDomain: Env.firebaseAuthDomain,
-  storageBucket: Env.firebaseStorageBucket,
 );
 
 Future<void> initFirebase() async {

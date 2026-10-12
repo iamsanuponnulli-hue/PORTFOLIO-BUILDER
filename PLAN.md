@@ -6,8 +6,10 @@
 > - Output: **plain HTML + CSS + JavaScript**, delivered as a **ZIP** (no hosting yet)
 > - **Thin server, heavy browser**: all processing (AI calls with the user's own key,
 >   resume parsing, images, rendering, checks, ZIP export) runs in the user's browser.
->   The server only does sign-in, stored data (with security rules), the Starter AI
->   relay, and account cleanup — small **TypeScript** Cloud Functions (§5)
+>   The server is Firebase's free Spark plan only: sign-in, the Firestore database
+>   (with security rules) and hosting. No server code of our own (§5)
+> - **Zero running cost, no card on file** (§13): no paid AI of our own, no Cloud
+>   Functions or Cloud Storage (both need Firebase's paid Blaze plan), no paid store fees
 > - AI: **model-agnostic** — works with any LLM provider that can be called from a
 >   browser (Anthropic, OpenAI, Google Gemini, Groq, OpenRouter, …), with graceful
 >   degradation when a model lacks a capability
@@ -15,13 +17,13 @@
 > - **Sign-in required** (Firebase Auth: Google, GitHub, email + verification)
 > - **Bring your own API key + model picker** — key stored **on this device only**, calls
 >   go straight from the browser to the provider; **Sign in with OpenRouter** as a
->   no-copy-paste option; plus a small free **Starter** allowance through a relay (§4.5)
+>   no-copy-paste option. Users bring a free key (Gemini, Groq, OpenRouter) (§4.5)
 > - **Companion browser extension** (Chrome/Edge) captures reference websites on the
 >   user's own computer (§3.10)
 > - **Contact forms link to an external form service** the user already uses (§3.8)
 > - **Full MVP scope** (Phases 0–6, ~13.5 weeks for one developer)
 > - **4 profile types at launch**: Developer, Designer, Student/New grad, General professional
-> - **No payments in MVP** — free Starter allowance + bring your own key
+> - **No payments in MVP** — users bring their own (free) AI key
 > - **English app UI**; site content in any left-to-right language
 
 ---
@@ -103,7 +105,8 @@ Why this matters:
    launch (§3.11); the section library already covers most of what they need.
 2. **Import** (each optional):
    - Resume (PDF/DOCX) → structured content. Text is extracted **in the browser**; the
-     file is only uploaded if the user wants a "Download resume" button on their site.
+     file stays on the user's computer (it's only bundled into the ZIP if they want a
+     "Download resume" button on their site).
    - LinkedIn: guide the user to download their LinkedIn profile as PDF, parsed like a resume.
    - GitHub username → pinned/top repos, languages, stars, README summaries → project cards
      (GitHub's API is called directly from the browser).
@@ -194,6 +197,12 @@ write meta description).
   freezes: resize to needed widths (`srcset`), encode WebP (canvas, with a WASM encoder
   where the browser lacks WebP encoding), EXIF stripped by re-encoding.
 - Avatar cropper; favicon from photo or initials; Open Graph image drawn on a canvas.
+- **Images and the resume file are stored on the user's computer** (IndexedDB), not in
+  the cloud: Cloud Storage needs a paid plan. Content, design and history sync through
+  Firestore; images don't. To move a project to another computer, the user downloads a
+  **project backup** (one file with content, design and images) and imports it there.
+  A project opened on a computer without its images shows placeholders and an
+  "Import backup or re-add images" prompt.
 - The **ZIP is built in the browser** (renderer + `fflate` in a worker) and downloaded
   directly — nothing is rendered or zipped on a server.
 - Resume PDF included as a download button (optional).
@@ -266,7 +275,10 @@ to, can — and it runs entirely on the user's computer.
   it (`externally_connectable`). Requests omit cookies.
 - **Without the extension**: the app detects it's missing, shows *Install extension*, and
   offers screenshot upload instead. Nothing else in the app depends on it.
-- Built with TypeScript (Manifest V3), published to the Chrome Web Store and Edge Add-ons.
+- Built with TypeScript (Manifest V3). **Distribution at no cost**: published on the
+  Microsoft Edge Add-ons store (free to publish — confirm at submission), and offered as
+  a download that Chrome, Brave and Opera users load with "Load unpacked". The Chrome
+  Web Store charges a one-time US$5 developer fee, so it waits until you're ready to pay it.
 
 ### 3.11 Later (post-MVP)
 - **Job-tailored variants**: paste a job description → a variant of the site that
@@ -304,9 +316,9 @@ interface LlmGateway {
 - **Implementation**: Vercel AI SDK (`ai` + `@ai-sdk/anthropic`, `@ai-sdk/openai`,
   `@ai-sdk/google`, `@ai-sdk/openai-compatible`) running in the browser, wrapped behind
   our own interface so it can be swapped for official SDKs per provider if needed.
-- **Two transports**: *direct* (user's own key → provider, straight from the browser)
-  and *relay* (Starter → our relay function → provider). Everything else — prompts,
-  fallbacks, validation, repair retries — is identical and runs in the browser.
+- **One transport**: the user's own key → provider, straight from the browser. There
+  is no relay and no app-owned key. A relay for a paid "Starter" allowance can be added
+  later behind the same interface without changing anything else.
 - **Model registry** (config, not code): each model's id, provider, context window, and
   capability flags — `pdfInput`, `imageInput`, `structuredOutput`, `toolUse`,
   `streaming`, `promptCaching`, `browserCallable` (provider allows calls from a web page;
@@ -364,32 +376,27 @@ setSectionOptions(id, options) · editCustomCode(file, find, replace) · createC
 **Regenerate options:** whole design (keeps content), one section (new variant/options),
 or a custom section's code.
 
-### 4.5 AI access: free starter, bring your own key, model picker
+### 4.5 AI access: your own free key, model picker
 
-**Is anything free?** Yes, with limits:
-- **This app's own AI use is already small.** Theme, layout, section and inline text
-  edits re-render locally with no AI call. Only intake, design generation and assistant
-  prompts use a model, and most of those produce small JSON that cheap models handle.
-- **Free provider tiers exist** (limits change often — re-check before launch):
-  Google Gemini API (free tier, Flash-class models), Groq (free daily limits per model),
-  OpenRouter (`:free` model variants, low daily request caps), Cloudflare Workers AI
-  (daily free allocation). Caveats: low rate limits, and some free tiers allow the
-  provider to use submitted data for training — users must be told this before sending
-  their resume through one.
-- Anthropic and OpenAI have no free API tier, but small models (e.g. Claude Haiku) are
-  cheap enough that a full generation costs a fraction of a cent.
+The app has **no AI of its own** (that would cost money per request). Every AI feature
+uses a key the user adds, and most users can get one for free:
 
-**Access modes** (chosen in Settings → AI):
+- **Free provider tiers** (limits change often — re-check before launch): Google Gemini
+  API (free tier, Flash-class models), Groq (free daily limits per model), OpenRouter
+  (`:free` model variants, low daily request caps). Caveats: low rate limits, and some
+  free tiers let the provider use submitted data for training — users are told this
+  before sending their resume through one.
+- **Paid keys work too** (Anthropic, OpenAI, Mistral, any OpenAI-compatible endpoint)
+  for people who already have one.
+- **The app needs little AI.** Theme, layout, section and inline text edits re-render
+  locally with no AI call. Only intake, design generation and assistant prompts use a
+  model, and most of those produce small JSON that small free models handle.
+- **Everything except AI works without a key**: the wizard (typing details by hand),
+  the default designs per profile type, the visual and code editors, export.
 
-| Mode | How it works | Best for |
-|---|---|---|
-| **Starter (default)** | Platform key on a low-cost model; monthly allowance per user (e.g. 3 full generations + 50 assistant edits); counters shown in the UI | Trying the app with zero setup |
-| **Bring your own key** | User adds a key for Anthropic, OpenAI, Google Gemini, Groq, OpenRouter, Mistral, or any OpenAI-compatible endpoint (custom base URL); no app limits beyond abuse protection | Regular use, free provider tiers, choosing premium models |
-
-Starter is deliberately not built on a free provider tier: those quotas are per key, so
-one shared key would be exhausted by a handful of users. Free tiers are offered through
-own keys instead, where each user gets their own quota. The app includes a step-by-step
-"Get a free Gemini / Groq / OpenRouter key" guide.
+**First run**: before the first AI step, a short "Connect a free AI" screen offers
+**Sign in with OpenRouter** (one click) or a step-by-step guide to a free Gemini or Groq
+key, with a "Skip — fill in by hand" option.
 
 **Adding a key — stored on this device only**
 1. Pick provider → paste key (and base URL for OpenAI-compatible), **or** click
@@ -414,15 +421,11 @@ own keys instead, where each user gets their own quota. The app includes a step-
 - Choice can be overridden per project; switching models never affects existing content.
 
 **Runtime behaviour**
-- **Own key**: the browser calls the provider directly. Our server never sees the
-  request, the key, or the user's data.
-- **Starter**: the browser sends the request to our **relay** function, which checks the
-  sign-in token, checks and counts the monthly allowance, adds our key, forwards to the
-  provider and streams the answer back. It only waits on the network — no processing.
-  Abuse limits: Starter model only, caps on input size and output tokens, per-user rate limit.
+- The browser calls the provider directly. No server of ours sees the request, the
+  key, or the user's data.
 - Provider errors are translated into clear messages: invalid key, out of credit,
-  rate-limited (with retry-after), model unavailable — with a one-click
-  "switch to Starter" or "pick another model".
+  rate-limited (with retry-after — common on free tiers), model unavailable — with a
+  one-click "pick another model".
 - Usage dashboard: requests and tokens per provider/model per month (from provider usage
   fields, recorded by the browser), so own-key users can track their own spend.
 
@@ -433,32 +436,38 @@ own keys instead, where each user gets their own quota. The app includes a step-
 ```
 ┌──────────────────────────── User's computer ────────────────────────────────────┐
 │ Flutter Web app — dashboard · intake · editor · settings                           │
-│   Riverpod · go_router · Firebase SDKs (Auth, Firestore, Storage)                 │
+│   Riverpod · go_router · Firebase SDKs (Auth, Firestore)                          │
 │   TS packages via JS interop, heavy work in Web Workers:                          │
 │     renderer · ai gateway · imports (pdf, docx, github) · assets (images)         │
-│     checks (axe) · export (zip) · Monaco editor · preview iframe (sandboxed)      │
+│     checks (axe) · export (zip) · keystore · Monaco editor · preview iframe       │
+│   IndexedDB: API keys (encrypted), images, resume, unsynced edits                 │
 │ Companion extension (Chrome/Edge) — reference-site capture, RSS, link checks       │
-└──────┬──────────────────────────┬───────────────────────────┬────────────────────┘
-       │ own key: direct           │ Starter only               │ data (security rules)
-       ▼                           ▼                            ▼
- LLM providers ◄──────── AI relay (Cloud Function)     Firebase Auth · Firestore ·
- (Anthropic, OpenAI,       verify token · quota ·      Cloud Storage · Hosting
-  Gemini, Groq,            add platform key ·
-  OpenRouter, …)           stream through              onUserDeleted (Cloud Function)
+└──────┬─────────────────────────────────────────────────┬───────────────────────────┘
+       │ user's own key, direct                           │ data (security rules)
+       ▼                                                  ▼
+ LLM providers (Gemini, Groq, OpenRouter,          Firebase Spark plan (free):
+ Anthropic, OpenAI, …)                             Auth · Firestore · Hosting
 ```
 
-**What runs on the server — the complete list**
+**What runs on the server — the complete list (all free, all managed by Google)**
 
-| Piece | Type | Job |
+| Piece | Free allowance (Spark plan) | Job |
 |---|---|---|
-| Firebase Auth | managed | Sign-in (Google, GitHub, email) |
-| Firestore + Storage | managed + security rules | Store projects, versions, images; rules allow each user only their own data |
-| Firebase Hosting | managed | Serve the Flutter app and landing page |
-| `aiRelay` | Cloud Function (TypeScript) | Starter requests only: verify token → check/count allowance → forward with our key → stream back |
-| `onUserDeleted` | Cloud Function (TypeScript) | Delete a user's projects and files when they delete their account |
-| Backups, file expiry, budget alerts | configuration | Scheduled Firestore export, Storage lifecycle rules, Google Cloud budget alerts |
+| Firebase Auth | Email, Google and GitHub sign-in | Sign-in |
+| Firestore | 1 GiB stored, 50k reads and 20k writes per day | Projects, design, content text, version history; owner-only rules |
+| Firebase Hosting | 10 GB stored, 360 MB/day transfer | Serves the app and its landing page |
 
-Everything else runs in the browser or the extension.
+No Cloud Functions, no Cloud Storage, no server code of ours. Everything else runs in
+the browser or the extension.
+
+**Staying inside the free allowance**
+- **Local-first saving**: edits save to IndexedDB instantly and sync to Firestore at
+  most every 30 seconds (and when the tab is hidden or closed), so one editing hour
+  costs ~120 writes instead of thousands.
+- **History cap**: the 30 most recent versions are kept per project.
+- **No images in the cloud**: they'd fill 1 GiB fast; they stay on the device (§3.7).
+- **If an allowance runs out**, Firestore pauses writes for the day; the app keeps
+  working locally and syncs the next day, and tells the user.
 
 ### Repository layout (monorepo)
 ```
@@ -490,9 +499,9 @@ packages/                 TypeScript, bundled with esbuild for the browser
   checks/                 portfolio score rules + axe runner
   export/                 ZIP builder (worker)
   keystore/               device-only encrypted key storage (WebCrypto + IndexedDB)
+  localstore/             IndexedDB: images, resume, unsynced edits; project backup files
 extension/                Manifest V3 companion extension (TypeScript)
-functions/                Cloud Functions: aiRelay, onUserDeleted
-firebase/                 firestore.rules, storage.rules, indexes, lifecycle config
+firebase/                 firestore.rules, indexes, rules tests
 evals/                    cross-model eval sets and runner (dev only)
 ```
 
@@ -508,13 +517,10 @@ evals/                    cross-model eval sets and runner (dev only)
 
 ```
 users/{uid}               displayName, email, authProviders[],
-                          ai: { mode: starter|own, simple: bool,
-                                smart: {provider, model}, fast: {...} }
+                          ai: { simple: bool, smart: {provider, model}, fast: {...} }
                           (keys are NOT stored here — they live only on the device)
-usage/{uid}               starter: { month, generations, edits }
-                          (written only by aiRelay; rules make it read-only for the client)
 projects/{pid}            ownerId, name, profileType, goals, status,
-                          content: PortfolioContent      (≤ ~200 KB; large text in Storage)
+                          content: PortfolioContent      (text only, ≤ ~200 KB)
                           spec: SiteSpec
                           custom: { css, js, sections: {id → {html, css, js}} }
                           inspiration: [{source, brief, screenshotPaths?}]
@@ -523,9 +529,9 @@ projects/{pid}            ownerId, name, profileType, goals, status,
                           currentVersionId, score, updatedAt
 projects/{pid}/versions/{vid}
                           createdAt, source (manual|assistant|regenerate|import),
-                          prompt?, summary, snapshotPath (content+spec+custom JSON in Storage)
-projects/{pid}/assets/{aid}
-                          originalPath, variants[{width, format, path}], alt, usage
+                          prompt?, summary, snapshot (content+spec+custom JSON, ≤ 900 KB)
+                          — the 30 newest are kept
+IndexedDB (device): assets/{aid} → original + resized WebP variants, alt; resume file
 ```
 
 Key schemas (abridged):
@@ -558,8 +564,7 @@ SiteSpec {
 - **Schema/operations**: unit tests that every operation validates and applies correctly.
 - **Browser packages**: import parsers against fixture resumes, image pipeline, ZIP
   structure, keystore, gateway fallbacks with mocked providers.
-- **Server**: relay tests (token check, quota counting, caps, streaming) and
-  security-rules tests in the Firebase emulator.
+- **Server**: security-rules tests in the Firebase emulator (there is no server code).
 - **Extension**: capture against fixture pages; messaging only from the app's domain.
 - **Flutter**: unit tests for controllers, widget tests for wizard/editor panels,
   integration test for intake → generate → edit → export with mocked providers.
@@ -573,17 +578,20 @@ SiteSpec {
 ## 8. Authentication, security & privacy
 - **Sign-in required** before anything is created: Firebase Auth with Google, GitHub
   (also reused for the GitHub import), and email/password with mandatory email
-  verification. Firestore/Storage rules and the relay check the user's sign-in token.
-- Account page: change email/password, linked sign-in methods, delete account (removes
-  projects, uploads, keys).
-- API keys: our Starter key lives only in Secret Manager, used by the relay. Users' own
-  keys stay on their device (encrypted, never uploaded). Because the browser holds the
+  verification. Firestore rules check the user's sign-in token.
+- Account page: change email/password, linked sign-in methods, delete account. With no
+  server code, the app deletes the user's projects, history and user document, clears
+  this device's local data, then deletes the sign-in account. It first checks the
+  sign-in is recent (Firebase requires it) so data is never deleted while the account
+  deletion would fail.
+- API keys: users' keys stay on their device (encrypted, never uploaded); the app has
+  no key of its own. Because the browser holds the
   key, the app ships a strict Content Security Policy, loads no third-party scripts,
   and runs generated sites only in the sandboxed preview.
-- Firestore/Storage rules: owner-only access.
-- Uploads: type and size limits (resume ≤ 10 MB, images ≤ 15 MB) checked in the browser
-  and enforced again by Storage rules; EXIF stripped before upload; users can delete
-  their data and resume at any time.
+- Firestore rules: owner-only access.
+- Files: type and size limits (resume ≤ 10 MB, images ≤ 15 MB) checked in the browser;
+  EXIF stripped on import; files never leave the device except inside the user's own
+  ZIP or backup.
 - Preview iframe sandboxed (`allow-scripts`, no `allow-same-origin`); click-to-select
   uses `postMessage` with origin checks.
 - Extension: minimal permissions, per-site access requested at capture time, accepts
@@ -591,12 +599,10 @@ SiteSpec {
   device until the user sends them to their chosen AI model.
 - Inspiration is for style only; prompts forbid copying third-party text, images, or
   logos, and captured screenshots are never included in exports.
-- Starter relay: per-user rate limits and monthly allowance; usage logged per model.
 - **Legal & privacy pages** before launch: privacy policy, terms of use, and an
-  AI-processing notice naming which provider receives the user's data (differs for
-  Starter vs own key; free provider tiers may train on data).
-- **Data rights**: export all my data (ZIP built in the browser), delete account. The
-  resume file is only uploaded if the user chooses to offer it as a download.
+  AI-processing notice naming which provider receives the user's data (the one whose
+  key they added; free provider tiers may train on data).
+- **Data rights**: export all my data (backup file built in the browser), delete account.
 - Prompt-injection hygiene: resume text, READMEs and reference pages are treated as
   data — wrapped and labelled in prompts; outputs are schema-validated operations, so
   injected instructions can't run arbitrary actions.
@@ -604,20 +610,21 @@ SiteSpec {
 ---
 
 ## 9. Operations
-- **Environments**: `dev` (emulators), `staging`, `prod` — separate Firebase projects.
-- **Hosting of the app itself**: Flutter Web on Firebase Hosting; two small Cloud
-  Functions. A small static marketing/landing page (Flutter Web is poor for SEO).
-- **Extension releases**: Chrome Web Store and Edge Add-ons (store review takes a few
-  days; plan releases ahead). The app works without the extension.
-- **Monitoring**: Sentry (app, extension, functions), Cloud Logging, alerts on relay
-  error rate and AI spend.
-- **Cost controls**: daily spend cap on the Starter key, budget alerts in Google Cloud,
-  per-user quotas. Server cost stays near zero because processing runs on users' devices.
-- **Product analytics**: privacy-friendly events (signup, first site generated, export,
-  own key added) to measure the success metrics in §1.
-- **Admin tools**: the Firebase console (look up a user, disable an account, edit the
-  usage document to reset a Starter allowance); no custom back office in MVP.
-- **Backups**: scheduled Firestore export; Storage versioning on project files.
+- **Environments**: `dev` (local emulators, no project needed) and `prod` (one free
+  Spark-plan Firebase project). A staging project can be added later (also free).
+- **Hosting**: Flutter Web on Firebase Hosting at the free `<project>.web.app` address.
+  A small static landing page on the same hosting (Flutter Web is poor for SEO).
+- **Extension releases**: Edge Add-ons (free) plus an unpacked download for
+  Chromium browsers (§3.10). The app works without the extension.
+- **Monitoring**: Sentry's free developer plan for app errors (optional), and the
+  Firebase console's usage graphs to watch the free allowances.
+- **Cost controls**: none needed — the Spark plan has no card, so it can't bill. When an
+  allowance runs out, the service pauses until the next day (§5).
+- **CI**: GitHub Actions (free for public repositories; 2,000 minutes/month for private).
+- **Admin tools**: the Firebase console (look up a user, disable an account); no custom
+  back office in MVP.
+- **Backups**: users download their own project backups. Automated Firestore exports
+  need the paid plan, so they wait.
 
 ---
 
@@ -627,9 +634,9 @@ SiteSpec {
 |---|---|---|
 | **0. Foundations** | Monorepo, CI (lint, typecheck, tests), Firebase project + security rules, Functions skeleton, Flutter shell with **required sign-in** (Google, GitHub, email) + dashboard, schema package + Dart codegen, JS-interop + Web Worker plumbing | 1 wk |
 | **1. Renderer & library** *(no AI)* | Theme system, ~12 section types × 2–3 variants, behaviours JS, case-study pages, renderer tests; a dev page that renders sample content | 2.5 wk |
-| **2. Intake & content** | Profile types, wizard, content forms, in-browser image pipeline, **client AI gateway + model registry + fallbacks**, **Starter relay**, **Settings → AI (device-only keys, Sign in with OpenRouter, model picker)**, in-browser resume parsing, GitHub import | 2.5 wk |
+| **2. Intake & content** | Profile types, wizard, content forms, in-browser image pipeline with device storage, **client AI gateway + model registry + fallbacks**, **"Connect a free AI" first-run screen**, **Settings → AI (device-only keys, Sign in with OpenRouter, model picker)**, in-browser resume parsing, GitHub import, local-first saving | 2.5 wk |
 | **3. Design generation** | **Companion extension** (capture, RSS, store listing), screenshot-upload fallback, inspiration briefs with mix-and-match, curated style gallery, 3 design directions | 2.5 wk |
-| **4. Editor workspace** | Preview with device widths, sections/theme/content panels, inline text editing, Monaco code mode with custom sections, contact-form service setup, versions, **in-browser ZIP export** | 2.5 wk |
+| **4. Editor workspace** | Preview with device widths, sections/theme/content panels, inline text editing, Monaco code mode with custom sections, contact-form service setup, versions, **in-browser ZIP export**, project backup download/import | 2.5 wk |
 | **5. AI assistant** | Prompt → operations, change summary + diff, click-to-select, regenerate section/design, custom section generation, content assistant (rewrite, tagline, case-study interview) | 2 wk |
 | **6. Score & polish** | Portfolio score + auto-fixes, onboarding polish, quotas, error states | 1.5 wk |
 | **7. Multi-model hardening** | Cross-model eval runs (incl. free-tier models), prompt tuning per tier, recommended-model labels, usage dashboard | 1 wk |
@@ -643,23 +650,25 @@ portfolio from the library with a default theme, no design AI yet.
 ---
 
 ## 11. Decisions log & remaining questions
-**Decided:** ZIP export · plain HTML/CSS/JS · Flutter Web · thin server (TypeScript
-Cloud Functions) with all processing in the browser · model-agnostic AI · own key stored
-on device only, called directly from the browser · Sign in with OpenRouter · free Starter
-allowance through a relay · companion browser extension for reference sites ·
-sign-in required · contact forms via external form service · full MVP scope (Phases 0–6) ·
-4 profile types · no payments · English UI with any LTR content language.
+**Decided:** ZIP export · plain HTML/CSS/JS · Flutter Web · all processing in the browser ·
+**zero running cost on Firebase's free Spark plan (no card)** · no server code · no
+app-owned AI: users bring their own (free) key, stored on device only and called
+directly from the browser · Sign in with OpenRouter · images stored on the user's device
+with backup/import · companion browser extension, distributed free (Edge Add-ons +
+unpacked) · sign-in required · contact forms via external form service · full MVP
+scope (Phases 0–6) · 4 profile types · no payments · English UI with any LTR content
+language.
 
 **Ruled out:** driving ChatGPT/Claude/Gemini chat websites inside the app (blocked by
 browsers in a web app, against those services' terms, and brittle); Playwright inside
-the web app (a web page can't control a browser, WASM or not).
+the web app (a web page can't control a browser, WASM or not); a Starter AI allowance,
+Cloud Functions and Cloud Storage (all cost money or need a card — can be added later).
 
 **Still open (decide during Phase 2, not blocking):**
-1. Starter allowance size and which low-cost model backs it.
-2. Which free-tier providers to feature in the "get a free key" guide (verify their
-   current limits and data-use terms at that time).
-3. Confirm each provider still allows browser calls (CORS) during Phase 2; any that
-   don't are left out of the own-key list.
+1. Which free providers to feature first in the "Connect a free AI" screen (verify
+   their current limits and data-use terms at that time).
+2. Confirm each provider still allows browser calls (CORS); any that don't are left
+   out of the own-key list.
 
 ---
 
@@ -674,8 +683,7 @@ the web app (a web page can't control a browser, WASM or not).
 - Portfolio content is the user's own; the AI never invents facts.
 
 **Technical**
-- Firebase (Auth, Firestore, Storage, Hosting) on Google Cloud, with two small Cloud
-  Functions as the only server code.
+- Firebase Spark plan only (Auth, Firestore, Hosting); no server code.
 - Vercel AI SDK, running in the browser, behind our own gateway interface.
 - Monaco as the code editor inside Flutter Web; renderer, AI gateway, imports, image
   processing, checks and export are TypeScript packages running in the browser.
@@ -688,7 +696,26 @@ the web app (a web page can't control a browser, WASM or not).
 **Business & team**
 - One full-time developer (estimates scale down with more people; Phases 1 and 2 can
   run in parallel with two).
-- You pay the Starter AI cost (small; capped daily), Google Cloud hosting (near zero at
-  MVP scale), and a one-time Chrome Web Store developer fee.
+- **Budget is $0.** Nothing in the MVP needs a card. The free allowances comfortably
+  cover early users; §13 lists what would cost money and when it might be worth it.
 - Privacy policy and terms are written before public launch (templates + review).
 - Launch region is global; GDPR-style data export/delete is built in from day one.
+
+---
+
+## 13. Running at zero cost
+
+| Need | Free choice | What would cost money (later, optional) |
+|---|---|---|
+| AI | User's own free key (Gemini, Groq, OpenRouter free models) | An app-paid "Starter" allowance via a relay function (Blaze plan + AI usage) |
+| Sign-in | Firebase Auth (Spark) | — |
+| Database | Firestore (Spark: 1 GiB, 50k reads / 20k writes per day) | More capacity (Blaze, pay per use) |
+| Images, resume, history files | On the user's device (IndexedDB) + backup file | Cloud Storage sync across devices (Blaze) |
+| Server code (account cleanup, relays) | None — done in the app | Cloud Functions (Blaze) |
+| App hosting | Firebase Hosting at `<project>.web.app` | Custom domain (domain registration) |
+| Extension | Edge Add-ons + unpacked download | Chrome Web Store listing (one-time US$5) |
+| Error monitoring | Sentry free plan (optional) | — |
+| CI | GitHub Actions free minutes | — |
+
+Upgrading any row later doesn't require redesign: the AI gateway, storage and account
+cleanup each sit behind one interface in the app.

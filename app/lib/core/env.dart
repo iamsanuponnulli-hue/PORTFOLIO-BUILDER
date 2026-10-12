@@ -23,10 +23,6 @@ class Env {
     'FIREBASE_AUTH_DOMAIN',
     defaultValue: 'demo-portfolio-builder.firebaseapp.com',
   );
-  static const firebaseStorageBucket = String.fromEnvironment(
-    'FIREBASE_STORAGE_BUCKET',
-    defaultValue: 'demo-portfolio-builder.appspot.com',
-  );
 
   /// Emulators are on by default and for any `demo-*` project.
   static const useEmulators = bool.fromEnvironment(
