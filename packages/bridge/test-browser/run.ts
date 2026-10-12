@@ -109,6 +109,7 @@ const check = (name: string, ok: boolean, detail?: unknown) => {
   console.log(`${ok ? 'ok  ' : 'FAIL'} ${name}`);
   if (!ok) failures.push(`${name}: ${JSON.stringify(detail)}`);
 };
+// eslint-disable-next-line @typescript-eslint/no-explicit-any -- test assertions read arbitrary result shapes
 type R = { ok: boolean; value?: any; error?: { code: string; message: string } };
 const pb = async (expr: string): Promise<R> =>
   JSON.parse(await page.evaluate(`(async () => ${expr})()`));
