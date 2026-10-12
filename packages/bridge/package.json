@@ -1,0 +1,18 @@
+{
+  "name": "@pb/bridge",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Browser bundle exposed to Flutter as window.pb, plus the background worker.",
+  "scripts": {
+    "build": "esbuild src/main.ts --bundle --format=iife --target=es2022 --minify --sourcemap --outfile=../../app/web/js/pb.js && esbuild src/worker.ts --bundle --format=iife --target=es2022 --minify --sourcemap --outfile=../../app/web/js/pb.worker.js",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@pb/schema": "workspace:*"
+  },
+  "devDependencies": {
+    "esbuild": "^0.28.2"
+  }
+}

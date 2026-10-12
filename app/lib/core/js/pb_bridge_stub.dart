@@ -1,0 +1,18 @@
+import 'pb_bridge_types.dart';
+
+PbBridge createPbBridge() => const _UnavailableBridge();
+
+class _UnavailableBridge implements PbBridge {
+  const _UnavailableBridge();
+  @override
+  bool get available => false;
+  @override
+  String get version => 'unavailable';
+  @override
+  String ping() => throw const PbUnavailable();
+  @override
+  Future<String> workerPing() => Future.error(const PbUnavailable());
+  @override
+  Future<String> normalizeContent(String json) =>
+      Future.error(const PbUnavailable());
+}

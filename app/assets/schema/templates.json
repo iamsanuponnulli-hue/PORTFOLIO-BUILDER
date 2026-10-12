@@ -1,0 +1,38 @@
+{
+  "content": {
+    "profile": {
+      "name": "",
+      "headline": "",
+      "tagline": "",
+      "bio": "",
+      "location": "",
+      "email": "",
+      "socials": []
+    },
+    "experience": [],
+    "projects": [],
+    "skills": [],
+    "education": [],
+    "certifications": [],
+    "awards": [],
+    "writing": [],
+    "testimonials": []
+  },
+  "goals": {
+    "purpose": "job",
+    "targetRole": "",
+    "tone": "minimal",
+    "colorPreference": "",
+    "colorMode": "auto",
+    "notes": ""
+  },
+  "custom": {
+    "css": "",
+    "js": "",
+    "sections": {}
+  },
+  "contactForm": {
+    "service": "none",
+    "value": ""
+  }
+}

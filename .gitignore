@@ -1,0 +1,22 @@
+node_modules/
+dist/
+functions/lib/
+coverage/
+*.log
+.env
+.env.*
+!.env.example
+# Firebase
+.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+storage-debug.log
+# Flutter
+app/.dart_tool/
+app/build/
+app/.flutter-plugins
+app/.flutter-plugins-dependencies
+app/web/js/
+.idea/
+.vscode/

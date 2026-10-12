@@ -1,0 +1,6 @@
+{
+  "projects": {
+    "default": "demo-portfolio-builder",
+    "dev": "demo-portfolio-builder"
+  }
+}

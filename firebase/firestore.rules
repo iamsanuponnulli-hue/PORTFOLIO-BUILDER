@@ -1,0 +1,105 @@
+rules_version = '2';
+
+// Owner-only access. Keep limits in sync with packages/schema/src/limits.ts.
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function signedIn() {
+      return request.auth != null;
+    }
+    function isUser(uid) {
+      return signedIn() && request.auth.uid == uid;
+    }
+    function verified() {
+      // Email/password users must verify their email; Google and GitHub sign-ins are trusted.
+      return request.auth.token.email_verified == true
+        || request.auth.token.firebase.sign_in_provider in ['google.com', 'github.com'];
+    }
+    function changed() {
+      return request.resource.data.diff(resource.data).affectedKeys();
+    }
+
+    // ---- users/{uid} -------------------------------------------------------
+    // projectCount moves by exactly one, in the same batch as a project create/delete.
+    match /users/{uid} {
+      allow read: if isUser(uid);
+      allow create: if isUser(uid)
+        && request.resource.data.keys().hasOnly(['displayName', 'email', 'ai', 'projectCount', 'createdAt'])
+        && request.resource.data.projectCount == 0;
+      allow update: if isUser(uid)
+        && request.resource.data.keys().hasOnly(['displayName', 'email', 'ai', 'projectCount', 'createdAt'])
+        && request.resource.data.createdAt == resource.data.createdAt
+        && request.resource.data.projectCount is int
+        && request.resource.data.projectCount >= 0
+        && request.resource.data.projectCount <= 5
+        && (request.resource.data.projectCount == resource.data.projectCount
+            || request.resource.data.projectCount == resource.data.projectCount + 1
+            || request.resource.data.projectCount == resource.data.projectCount - 1);
+      allow delete: if false;
+    }
+
+    // ---- usage/{uid}: written only by the aiRelay function (Admin SDK) ------
+    match /usage/{uid} {
+      allow read: if isUser(uid);
+      allow write: if false;
+    }
+
+    // ---- projects/{pid} ----------------------------------------------------
+    function validProject(d) {
+      return d.ownerId is string
+        && d.name is string && d.name.size() > 0 && d.name.size() <= 80
+        && d.profileType in ['developer', 'designer', 'student', 'professional']
+        && d.status in ['draft', 'generating', 'choosing', 'editing', 'exported']
+        && d.revision is int
+        && d.createdAt is int && d.updatedAt is int;
+    }
+    function userAfter() {
+      return getAfter(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+    function userBefore() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data;
+    }
+
+    match /projects/{pid} {
+      allow read: if signedIn() && resource.data.ownerId == request.auth.uid;
+
+      allow create: if signedIn() && verified()
+        && request.resource.data.ownerId == request.auth.uid
+        && validProject(request.resource.data)
+        && request.resource.data.revision == 0
+        && userAfter().projectCount == userBefore().projectCount + 1
+        && userAfter().projectCount <= 5;
+
+      // revision must advance by one: a stale tab can't overwrite newer changes.
+      allow update: if signedIn() && verified()
+        && resource.data.ownerId == request.auth.uid
+        && validProject(request.resource.data)
+        && !changed().hasAny(['ownerId', 'createdAt'])
+        && request.resource.data.revision == resource.data.revision + 1;
+
+      allow delete: if signedIn()
+        && resource.data.ownerId == request.auth.uid
+        && userAfter().projectCount == userBefore().projectCount - 1;
+
+      function ownsParent() {
+        return signedIn()
+          && get(/databases/$(database)/documents/projects/$(pid)).data.ownerId == request.auth.uid;
+      }
+
+      // Versions are immutable snapshots (metadata here, body in Storage).
+      match /versions/{vid} {
+        allow read: if ownsParent();
+        allow create: if ownsParent() && verified()
+          && request.resource.data.source in ['generate', 'manual', 'assistant', 'regenerate', 'import']
+          && request.resource.data.createdAt is int;
+        allow update: if false;
+        allow delete: if ownsParent();
+      }
+    }
+
+    // Everything else is closed.
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

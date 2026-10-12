@@ -1,0 +1,1241 @@
+{
+  "title": "PortfolioBuilderModels",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "projectDoc": {
+      "$ref": "#/definitions/ProjectDoc"
+    },
+    "userDoc": {
+      "$ref": "#/definitions/UserDoc"
+    },
+    "usageDoc": {
+      "$ref": "#/definitions/UsageDoc"
+    }
+  },
+  "required": [
+    "projectDoc",
+    "userDoc",
+    "usageDoc"
+  ],
+  "additionalProperties": false,
+  "definitions": {
+    "ProjectDoc": {
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 80
+        },
+        "profileType": {
+          "$ref": "#/definitions/ProfileType"
+        },
+        "status": {
+          "$ref": "#/definitions/ProjectStatus"
+        },
+        "goals": {
+          "default": {
+            "purpose": "job",
+            "targetRole": "",
+            "tone": "minimal",
+            "colorPreference": "",
+            "colorMode": "auto",
+            "notes": ""
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/Goals"
+            }
+          ]
+        },
+        "content": {
+          "default": {
+            "profile": {
+              "name": "",
+              "headline": "",
+              "tagline": "",
+              "bio": "",
+              "location": "",
+              "email": "",
+              "socials": []
+            },
+            "experience": [],
+            "projects": [],
+            "skills": [],
+            "education": [],
+            "certifications": [],
+            "awards": [],
+            "writing": [],
+            "testimonials": []
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/PortfolioContent"
+            }
+          ]
+        },
+        "spec": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/SiteSpec"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "custom": {
+          "default": {
+            "css": "",
+            "js": "",
+            "sections": {}
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/CustomCode"
+            }
+          ]
+        },
+        "contactForm": {
+          "default": {
+            "service": "none",
+            "value": ""
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/ContactForm"
+            }
+          ]
+        },
+        "currentVersionId": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "revision": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "createdAt": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "updatedAt": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "ownerId",
+        "name",
+        "profileType",
+        "status",
+        "goals",
+        "content",
+        "custom",
+        "contactForm",
+        "revision",
+        "createdAt",
+        "updatedAt"
+      ],
+      "additionalProperties": false
+    },
+    "ProfileType": {
+      "type": "string",
+      "enum": [
+        "developer",
+        "designer",
+        "student",
+        "professional"
+      ]
+    },
+    "ProjectStatus": {
+      "type": "string",
+      "enum": [
+        "draft",
+        "generating",
+        "choosing",
+        "editing",
+        "exported"
+      ]
+    },
+    "Goals": {
+      "type": "object",
+      "properties": {
+        "purpose": {
+          "default": "job",
+          "type": "string",
+          "enum": [
+            "job",
+            "freelance",
+            "academic",
+            "personal"
+          ]
+        },
+        "targetRole": {
+          "default": "",
+          "type": "string",
+          "maxLength": 160
+        },
+        "tone": {
+          "default": "minimal",
+          "type": "string",
+          "enum": [
+            "minimal",
+            "bold",
+            "playful",
+            "elegant",
+            "technical"
+          ]
+        },
+        "colorPreference": {
+          "default": "",
+          "type": "string",
+          "maxLength": 200
+        },
+        "colorMode": {
+          "default": "auto",
+          "type": "string",
+          "enum": [
+            "light",
+            "dark",
+            "auto"
+          ]
+        },
+        "notes": {
+          "default": "",
+          "type": "string",
+          "maxLength": 2000
+        }
+      },
+      "required": [
+        "purpose",
+        "targetRole",
+        "tone",
+        "colorPreference",
+        "colorMode",
+        "notes"
+      ],
+      "additionalProperties": false
+    },
+    "PortfolioContent": {
+      "type": "object",
+      "properties": {
+        "profile": {
+          "default": {
+            "name": "",
+            "headline": "",
+            "tagline": "",
+            "bio": "",
+            "location": "",
+            "email": "",
+            "socials": []
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/Profile"
+            }
+          ]
+        },
+        "experience": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ExperienceItem"
+          }
+        },
+        "projects": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ProjectItem"
+          }
+        },
+        "skills": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SkillGroup"
+          }
+        },
+        "education": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/EducationItem"
+          }
+        },
+        "certifications": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SimpleItem"
+          }
+        },
+        "awards": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SimpleItem"
+          }
+        },
+        "writing": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SimpleItem"
+          }
+        },
+        "testimonials": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Testimonial"
+          }
+        }
+      },
+      "required": [
+        "profile",
+        "experience",
+        "projects",
+        "skills",
+        "education",
+        "certifications",
+        "awards",
+        "writing",
+        "testimonials"
+      ],
+      "additionalProperties": false
+    },
+    "Profile": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "default": "",
+          "type": "string",
+          "maxLength": 120
+        },
+        "headline": {
+          "default": "",
+          "type": "string",
+          "maxLength": 160
+        },
+        "tagline": {
+          "default": "",
+          "type": "string",
+          "maxLength": 240
+        },
+        "bio": {
+          "default": "",
+          "type": "string",
+          "maxLength": 4000
+        },
+        "location": {
+          "default": "",
+          "type": "string",
+          "maxLength": 120
+        },
+        "email": {
+          "default": "",
+          "type": "string",
+          "maxLength": 254
+        },
+        "photo": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ImageRef"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "socials": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Link"
+          }
+        }
+      },
+      "required": [
+        "name",
+        "headline",
+        "tagline",
+        "bio",
+        "location",
+        "email",
+        "socials"
+      ],
+      "additionalProperties": false
+    },
+    "ImageRef": {
+      "type": "object",
+      "properties": {
+        "assetId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "alt": {
+          "default": "",
+          "type": "string",
+          "maxLength": 300
+        }
+      },
+      "required": [
+        "assetId",
+        "alt"
+      ],
+      "additionalProperties": false
+    },
+    "Link": {
+      "type": "object",
+      "properties": {
+        "label": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "url": {
+          "type": "string",
+          "maxLength": 2048
+        }
+      },
+      "required": [
+        "label",
+        "url"
+      ],
+      "additionalProperties": false
+    },
+    "ExperienceItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "company": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "role": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "start": {
+          "default": "",
+          "type": "string",
+          "maxLength": 40
+        },
+        "end": {
+          "default": "",
+          "type": "string",
+          "maxLength": 40
+        },
+        "location": {
+          "default": "",
+          "type": "string",
+          "maxLength": 120
+        },
+        "bullets": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 600
+          }
+        },
+        "tech": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 60
+          }
+        }
+      },
+      "required": [
+        "id",
+        "company",
+        "role",
+        "start",
+        "end",
+        "location",
+        "bullets",
+        "tech"
+      ],
+      "additionalProperties": false
+    },
+    "ProjectItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "summary": {
+          "default": "",
+          "type": "string",
+          "maxLength": 1000
+        },
+        "role": {
+          "default": "",
+          "type": "string",
+          "maxLength": 160
+        },
+        "tech": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 60
+          }
+        },
+        "links": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Link"
+          }
+        },
+        "images": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/ImageRef"
+          }
+        },
+        "tags": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 40
+          }
+        },
+        "featured": {
+          "default": false,
+          "type": "boolean"
+        },
+        "caseStudy": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/CaseStudy"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "summary",
+        "role",
+        "tech",
+        "links",
+        "images",
+        "tags",
+        "featured"
+      ],
+      "additionalProperties": false
+    },
+    "CaseStudy": {
+      "type": "object",
+      "properties": {
+        "problem": {
+          "default": "",
+          "type": "string",
+          "maxLength": 4000
+        },
+        "role": {
+          "default": "",
+          "type": "string",
+          "maxLength": 2000
+        },
+        "process": {
+          "default": "",
+          "type": "string",
+          "maxLength": 8000
+        },
+        "outcome": {
+          "default": "",
+          "type": "string",
+          "maxLength": 4000
+        },
+        "body": {
+          "default": "",
+          "type": "string",
+          "maxLength": 20000
+        }
+      },
+      "required": [
+        "problem",
+        "role",
+        "process",
+        "outcome",
+        "body"
+      ],
+      "additionalProperties": false
+    },
+    "SkillGroup": {
+      "type": "object",
+      "properties": {
+        "group": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "items": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 60
+          }
+        }
+      },
+      "required": [
+        "group",
+        "items"
+      ],
+      "additionalProperties": false
+    },
+    "EducationItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "institution": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "degree": {
+          "default": "",
+          "type": "string",
+          "maxLength": 160
+        },
+        "start": {
+          "default": "",
+          "type": "string",
+          "maxLength": 40
+        },
+        "end": {
+          "default": "",
+          "type": "string",
+          "maxLength": 40
+        },
+        "details": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 400
+          }
+        }
+      },
+      "required": [
+        "id",
+        "institution",
+        "degree",
+        "start",
+        "end",
+        "details"
+      ],
+      "additionalProperties": false
+    },
+    "SimpleItem": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "title": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "issuer": {
+          "default": "",
+          "type": "string",
+          "maxLength": 160
+        },
+        "date": {
+          "default": "",
+          "type": "string",
+          "maxLength": 40
+        },
+        "url": {
+          "default": "",
+          "type": "string",
+          "maxLength": 2048
+        },
+        "description": {
+          "default": "",
+          "type": "string",
+          "maxLength": 1000
+        }
+      },
+      "required": [
+        "id",
+        "title",
+        "issuer",
+        "date",
+        "url",
+        "description"
+      ],
+      "additionalProperties": false
+    },
+    "Testimonial": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "quote": {
+          "type": "string",
+          "maxLength": 1500
+        },
+        "author": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "role": {
+          "default": "",
+          "type": "string",
+          "maxLength": 160
+        }
+      },
+      "required": [
+        "id",
+        "quote",
+        "author",
+        "role"
+      ],
+      "additionalProperties": false
+    },
+    "SiteSpec": {
+      "type": "object",
+      "properties": {
+        "theme": {
+          "$ref": "#/definitions/ThemeTokens"
+        },
+        "nav": {
+          "type": "object",
+          "properties": {
+            "variant": {
+              "type": "string",
+              "maxLength": 40
+            }
+          },
+          "required": [
+            "variant"
+          ],
+          "additionalProperties": false
+        },
+        "sections": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SectionSpec"
+          }
+        },
+        "pages": {
+          "type": "object",
+          "properties": {
+            "caseStudies": {
+              "default": false,
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "caseStudies"
+          ],
+          "additionalProperties": false
+        },
+        "seo": {
+          "$ref": "#/definitions/SeoSpec"
+        }
+      },
+      "required": [
+        "theme",
+        "nav",
+        "sections",
+        "pages",
+        "seo"
+      ],
+      "additionalProperties": false
+    },
+    "ThemeTokens": {
+      "type": "object",
+      "properties": {
+        "colors": {
+          "type": "object",
+          "properties": {
+            "light": {
+              "$ref": "#/definitions/ColorSet"
+            },
+            "dark": {
+              "$ref": "#/definitions/ColorSet"
+            }
+          },
+          "required": [
+            "light",
+            "dark"
+          ],
+          "additionalProperties": false
+        },
+        "fonts": {
+          "type": "object",
+          "properties": {
+            "heading": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "body": {
+              "type": "string",
+              "maxLength": 60
+            },
+            "mono": {
+              "type": "string",
+              "maxLength": 60
+            }
+          },
+          "required": [
+            "heading",
+            "body",
+            "mono"
+          ],
+          "additionalProperties": false
+        },
+        "scale": {
+          "type": "number",
+          "minimum": 1.1,
+          "maximum": 1.5
+        },
+        "radius": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 32
+        },
+        "density": {
+          "type": "string",
+          "enum": [
+            "compact",
+            "comfortable",
+            "roomy"
+          ]
+        },
+        "shadow": {
+          "type": "string",
+          "enum": [
+            "none",
+            "soft",
+            "strong"
+          ]
+        },
+        "motion": {
+          "type": "string",
+          "enum": [
+            "none",
+            "subtle",
+            "lively"
+          ]
+        },
+        "width": {
+          "type": "number",
+          "minimum": 720,
+          "maximum": 1440
+        },
+        "colorMode": {
+          "$ref": "#/definitions/ColorMode"
+        }
+      },
+      "required": [
+        "colors",
+        "fonts",
+        "scale",
+        "radius",
+        "density",
+        "shadow",
+        "motion",
+        "width",
+        "colorMode"
+      ],
+      "additionalProperties": false
+    },
+    "ColorSet": {
+      "type": "object",
+      "properties": {
+        "background": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "surface": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "text": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "muted": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "primary": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "accent": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        },
+        "border": {
+          "type": "string",
+          "pattern": "^#[0-9a-fA-F]{6}$"
+        }
+      },
+      "required": [
+        "background",
+        "surface",
+        "text",
+        "muted",
+        "primary",
+        "accent",
+        "border"
+      ],
+      "additionalProperties": false
+    },
+    "ColorMode": {
+      "type": "string",
+      "enum": [
+        "light",
+        "dark",
+        "auto"
+      ]
+    },
+    "SectionSpec": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "type": {
+          "$ref": "#/definitions/SectionType"
+        },
+        "variant": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "visible": {
+          "default": true,
+          "type": "boolean"
+        },
+        "options": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "custom": {
+          "default": false,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id",
+        "type",
+        "variant",
+        "visible",
+        "options",
+        "custom"
+      ],
+      "additionalProperties": false
+    },
+    "SectionType": {
+      "type": "string",
+      "enum": [
+        "hero",
+        "about",
+        "experience",
+        "projects",
+        "skills",
+        "education",
+        "certifications",
+        "awards",
+        "writing",
+        "testimonials",
+        "gallery",
+        "contact"
+      ]
+    },
+    "SeoSpec": {
+      "type": "object",
+      "properties": {
+        "title": {
+          "default": "",
+          "type": "string",
+          "maxLength": 70
+        },
+        "description": {
+          "default": "",
+          "type": "string",
+          "maxLength": 170
+        },
+        "url": {
+          "default": "",
+          "type": "string",
+          "maxLength": 2048
+        },
+        "keywords": {
+          "default": [],
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 40
+          }
+        }
+      },
+      "required": [
+        "title",
+        "description",
+        "url",
+        "keywords"
+      ],
+      "additionalProperties": false
+    },
+    "CustomCode": {
+      "type": "object",
+      "properties": {
+        "css": {
+          "default": "",
+          "type": "string"
+        },
+        "js": {
+          "default": "",
+          "type": "string"
+        },
+        "sections": {
+          "default": {},
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "$ref": "#/definitions/CustomSection"
+          }
+        }
+      },
+      "required": [
+        "css",
+        "js",
+        "sections"
+      ],
+      "additionalProperties": false
+    },
+    "CustomSection": {
+      "type": "object",
+      "properties": {
+        "html": {
+          "type": "string"
+        },
+        "css": {
+          "default": "",
+          "type": "string"
+        },
+        "js": {
+          "default": "",
+          "type": "string"
+        }
+      },
+      "required": [
+        "html",
+        "css",
+        "js"
+      ],
+      "additionalProperties": false
+    },
+    "ContactForm": {
+      "type": "object",
+      "properties": {
+        "service": {
+          "default": "none",
+          "type": "string",
+          "enum": [
+            "none",
+            "formspree",
+            "web3forms",
+            "endpoint",
+            "link"
+          ]
+        },
+        "value": {
+          "default": "",
+          "type": "string",
+          "maxLength": 2048
+        }
+      },
+      "required": [
+        "service",
+        "value"
+      ],
+      "additionalProperties": false
+    },
+    "UserDoc": {
+      "type": "object",
+      "properties": {
+        "displayName": {
+          "default": "",
+          "type": "string",
+          "maxLength": 120
+        },
+        "email": {
+          "default": "",
+          "type": "string",
+          "maxLength": 254
+        },
+        "ai": {
+          "default": {
+            "mode": "starter",
+            "simple": true
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/AiSettings"
+            }
+          ]
+        },
+        "projectCount": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "createdAt": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "displayName",
+        "email",
+        "ai",
+        "projectCount",
+        "createdAt"
+      ],
+      "additionalProperties": false
+    },
+    "AiSettings": {
+      "type": "object",
+      "properties": {
+        "mode": {
+          "default": "starter",
+          "type": "string",
+          "enum": [
+            "starter",
+            "own"
+          ]
+        },
+        "simple": {
+          "default": true,
+          "type": "boolean"
+        },
+        "smart": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ModelChoice"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "fast": {
+          "anyOf": [
+            {
+              "$ref": "#/definitions/ModelChoice"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "required": [
+        "mode",
+        "simple"
+      ],
+      "additionalProperties": false
+    },
+    "ModelChoice": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "model": {
+          "type": "string",
+          "maxLength": 120
+        }
+      },
+      "required": [
+        "provider",
+        "model"
+      ],
+      "additionalProperties": false
+    },
+    "UsageDoc": {
+      "type": "object",
+      "properties": {
+        "month": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}$"
+        },
+        "generations": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "edits": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "month",
+        "generations",
+        "edits"
+      ],
+      "additionalProperties": false
+    }
+  }
+}

@@ -1,0 +1,29 @@
+{
+  "name": "portfolio-builder",
+  "private": true,
+  "packageManager": "pnpm@10.15.0",
+  "engines": {
+    "node": ">=22.12.0"
+  },
+  "scripts": {
+    "build": "pnpm -r run build",
+    "typecheck": "pnpm -r run typecheck",
+    "test": "pnpm -r run test",
+    "test:emulator": "pnpm -r run test:emulator",
+    "lint": "eslint . && prettier --check .",
+    "format": "prettier --write .",
+    "codegen": "pnpm --filter @pb/schema run codegen",
+    "bridge": "pnpm --filter @pb/bridge run build",
+    "emulators": "firebase emulators:start --only auth,firestore,storage,functions --project demo-portfolio-builder"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.0",
+    "@types/node": "^22.18.0",
+    "eslint": "^9.39.0",
+    "prettier": "^3.9.10",
+    "typescript": "5.9.3",
+    "typescript-eslint": "^8.71.1",
+    "vitest": "^5.0.4",
+    "firebase-tools": "^15.33.0"
+  }
+}

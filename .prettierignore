@@ -1,0 +1,7 @@
+app/
+docs/
+**/dist/
+**/lib/
+**/generated/
+pnpm-lock.yaml
+PLAN.md

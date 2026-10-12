@@ -1,0 +1,25 @@
+{
+  "name": "@pb/schema",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./limits": "./src/limits.ts"
+  },
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "build": "tsc --noEmit",
+    "json-schema": "node --experimental-strip-types scripts/export-json-schema.ts",
+    "codegen": "pnpm run json-schema && node --experimental-strip-types scripts/generate-dart.ts"
+  },
+  "dependencies": {
+    "zod": "^4.6.6"
+  },
+  "devDependencies": {
+    "quicktype": "^26.0.0"
+  }
+}
