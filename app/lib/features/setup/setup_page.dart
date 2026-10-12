@@ -191,17 +191,27 @@ class SyncIndicator extends StatelessWidget {
       SyncState.syncing => (Icons.cloud_upload_outlined, 'Syncing…'),
       SyncState.offline => (
         Icons.cloud_off_outlined,
-        'Saved on this computer · will sync later',
+        'Offline · will sync later',
       ),
       SyncState.conflict => (Icons.warning_amber_outlined, 'Changed elsewhere'),
     };
-    return Row(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Icon(icon, size: 18),
-        const SizedBox(width: 6),
-        Text(text, style: Theme.of(context).textTheme.bodySmall),
-      ],
+    // Fixed width so the toolbar doesn't shift as the status changes.
+    return SizedBox(
+      width: 210,
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.end,
+        children: [
+          Icon(icon, size: 18),
+          const SizedBox(width: 6),
+          Flexible(
+            child: Text(
+              text,
+              style: Theme.of(context).textTheme.bodySmall,
+              overflow: TextOverflow.ellipsis,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

@@ -22,9 +22,13 @@ final aiChoiceProvider = Provider<AiChoice?>((ref) {
   return AiChoice(smart.provider, smart.model);
 });
 
-final aiReadyProvider = FutureProvider<bool>((ref) async {
-  final choice = ref.watch(aiChoiceProvider);
-  if (choice == null) return false;
+/// The chosen provider and model when its key is on this device, else null.
+/// Waits for the user doc, so it's safe to read before anything has loaded.
+final readyAiProvider = FutureProvider<AiChoice?>((ref) async {
+  final smart = (await ref.watch(userDocProvider.future))?.ai.smart;
+  if (smart == null) return null;
   final keys = await ref.watch(savedKeysProvider.future);
-  return keys.any((k) => k.provider == choice.provider);
+  return keys.any((k) => k.provider == smart.provider)
+      ? AiChoice(smart.provider, smart.model)
+      : null;
 });

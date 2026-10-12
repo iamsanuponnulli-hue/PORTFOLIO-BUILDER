@@ -7,14 +7,19 @@ HTML/CSS/JS as a ZIP.
 - **Plan:** [`PLAN.md`](PLAN.md)
 - **Architecture, screens and control flows:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 
-**Status:** Phases 0 and 1 are done.
+**Status:** Phases 0, 1 and 2 are done.
 
 - Phase 0: sign-in, the dashboard, data rules and the browser-package bridge.
 - Phase 1: the site renderer — 12 section types with 2–4 layouts each, 6 theme
   presets, default designs for the 4 profile types, case-study pages, contact forms,
   SEO tags, instant checks, and the edit operations every change goes through.
+- Phase 2: connect your own AI (a free key, Sign in with OpenRouter, or any
+  OpenAI-compatible endpoint) and pick a model; the setup wizard — import a resume
+  (read by your AI) or GitHub repositories, check and complete the content, set goals,
+  then create the site; the live preview with device widths and design presets.
+  Edits are saved on this device at once and synced at most every 30 seconds.
 
-The setup wizard, editor and AI features come in Phases 2–5.
+Design directions, the editor and the AI assistant come in Phases 3–5.
 
 ## How it's built
 
@@ -28,6 +33,9 @@ the browser. See [PLAN.md §13](PLAN.md#13-running-at-zero-cost).
 app/                Flutter Web app (Riverpod, go_router, Firebase)
 packages/schema     Shared data definitions (zod) → JSON Schema → Dart models
 packages/renderer   Content + design spec → static HTML/CSS/JS site (pure, deterministic)
+packages/ai         AI calls with the user's own key (any provider), resume reading
+packages/imports    Resume text (PDF, Word), GitHub import, image resizing
+packages/localstore On-device storage: encrypted keys, images, unsynced edits
 packages/bridge     Browser bundle exposed to Flutter as window.pb, plus a Web Worker
 firebase/           Firestore security rules, with emulator tests
 docs/               Architecture and flows

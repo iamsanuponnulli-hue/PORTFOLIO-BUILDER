@@ -75,13 +75,17 @@ class _ImportStepState extends ConsumerState<ImportStep> {
         );
         return;
       }
-      var ready = await ref.read(aiReadyProvider.future);
-      if (!ready && mounted) {
-        ready = await showConnectAi(context, ref);
-        ref.invalidate(aiReadyProvider);
+      // Keys may have been added in another tab: read them fresh.
+      ref.invalidate(savedKeysProvider);
+      var ready = await ref.read(readyAiProvider.future);
+      if (ready == null && mounted) {
+        if (await showConnectAi(context, ref)) {
+          ref.invalidate(savedKeysProvider);
+          ready = await ref.read(readyAiProvider.future);
+        }
       }
-      final choice = ref.read(aiChoiceProvider);
-      if (!ready || choice == null) {
+      final choice = ready;
+      if (choice == null) {
         setState(
           () => _resumeNote =
               'Your resume is saved on this computer. Without an AI connected, fill in your '
@@ -139,6 +143,8 @@ class _ImportStepState extends ConsumerState<ImportStep> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // Watching keeps the user's AI choice live (e.g. changed in another tab).
+    final ai = ref.watch(readyAiProvider).value;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -153,7 +159,9 @@ class _ImportStepState extends ConsumerState<ImportStep> {
         const SizedBox(height: 20),
         SectionCard(
           title: 'Resume',
-          subtitle: 'PDF, Word (.docx) or text. Read by your own AI key, which copies facts only.',
+          subtitle:
+              'PDF, Word (.docx) or text. Read by your own AI, which copies facts only. '
+              '${ai == null ? 'No AI connected yet.' : 'Uses ${ai.model}.'}',
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [

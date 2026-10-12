@@ -77,15 +77,14 @@ final routerProvider = Provider<GoRouter>((ref) {
         path: '/p/:id',
         builder: (_, state) =>
             PreviewPage(projectId: state.pathParameters['id']!),
-        routes: [
-          GoRoute(
-            path: 'setup',
-            builder: (_, state) => SetupPage(
-              projectId: state.pathParameters['id']!,
-              step: SetupStep.parse(state.uri.queryParameters['step']),
-            ),
-          ),
-        ],
+      ),
+      // Not nested under /p/:id: each page owns the only open session.
+      GoRoute(
+        path: '/p/:id/setup',
+        builder: (_, state) => SetupPage(
+          projectId: state.pathParameters['id']!,
+          step: SetupStep.parse(state.uri.queryParameters['step']),
+        ),
       ),
     ],
   );

@@ -494,12 +494,12 @@ packages/                 TypeScript, bundled with esbuild for the browser
                           Operation → exported as JSON Schema
   renderer/               render(content, spec, custom) → files; apply(op)
   ai/                     gateway, model registry, prompts, fallbacks, transports
-  imports/                pdf/docx text extraction, GitHub, feed parsing
-  assets/                 image pipeline (worker), favicon, OG image
+  imports/                pdf/docx text extraction, GitHub, feed parsing, image resizing
+  assets/                 favicon, OG image
   checks/                 portfolio score rules + axe runner
   export/                 ZIP builder (worker)
-  keystore/               device-only encrypted key storage (WebCrypto + IndexedDB)
-  localstore/             IndexedDB: images, resume, unsynced edits; project backup files
+  localstore/             IndexedDB: encrypted keys (WebCrypto), images, resume,
+                          unsynced edits; project backup files
 extension/                Manifest V3 companion extension (TypeScript)
 firebase/                 firestore.rules, indexes, rules tests
 evals/                    cross-model eval sets and runner (dev only)
