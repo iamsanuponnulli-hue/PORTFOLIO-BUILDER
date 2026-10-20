@@ -33,4 +33,8 @@ class Env {
     'EMULATOR_HOST',
     defaultValue: 'localhost',
   );
+
+  /// Where people install the companion extension (Edge Add-ons listing or a
+  /// download page). Empty hides the install link; screenshot upload still works.
+  static const extensionUrl = String.fromEnvironment('EXTENSION_URL');
 }

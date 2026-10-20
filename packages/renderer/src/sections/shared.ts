@@ -10,6 +10,8 @@ export interface Ctx {
   state: SiteState;
   opts: RenderOptions;
   section: Section;
+  /** "" on the home page, "../" on pages one folder down (relative asset paths). */
+  root: string;
   /** Section heading (option `title`, else the catalogue default). */
   title: string;
   /** Inline-edit marker for a content path, only in editable preview. */
@@ -67,6 +69,19 @@ export interface ImgOpts {
   eager?: boolean;
 }
 
+/** Relative asset paths (export) are made relative to the current page. */
+export const assetUrl = (ctx: Ctx, src: string) =>
+  /^(?:[a-z][a-z0-9+.-]*:|\/)/i.test(src) ? src : ctx.root + src;
+
+const srcsetFor = (ctx: Ctx, srcset: string) =>
+  srcset
+    .split(',')
+    .map((part) => {
+      const [url, ...rest] = part.trim().split(/\s+/);
+      return [assetUrl(ctx, url!), ...rest].join(' ');
+    })
+    .join(', ');
+
 /** An uploaded image, or a decorative placeholder when it's missing. */
 export function img(
   ctx: Ctx,
@@ -80,8 +95,10 @@ export function img(
   }
   const alt = ref?.alt ?? o.alt ?? '';
   return (
-    `<img${className} src="${esc(asset.src)}"` +
-    (asset.srcset ? ` srcset="${esc(asset.srcset)}" sizes="${esc(o.sizes ?? '100vw')}"` : '') +
+    `<img${className} src="${esc(assetUrl(ctx, asset.src))}"` +
+    (asset.srcset
+      ? ` srcset="${esc(srcsetFor(ctx, asset.srcset))}" sizes="${esc(o.sizes ?? '100vw')}"`
+      : '') +
     (asset.width && asset.height ? ` width="${asset.width}" height="${asset.height}"` : '') +
     ` alt="${esc(alt)}" ${o.eager ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async">`
   );

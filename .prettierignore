@@ -6,3 +6,4 @@ docs/
 pnpm-lock.yaml
 PLAN.md
 **/.gallery/
+extension/dist/

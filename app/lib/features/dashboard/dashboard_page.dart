@@ -3,7 +3,9 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../app/providers.dart';
+import '../../core/js/pb_bridge.dart';
 import '../../core/ui/feedback.dart';
+import '../../models/generated/models.dart' hide Colors;
 import '../../models/profile_types.dart';
 import 'project_dialogs.dart';
 import 'project_repository.dart';
@@ -27,6 +29,33 @@ class DashboardPage extends ConsumerWidget {
     } catch (_) {
       if (context.mounted) {
         showMessage(context, 'Couldn\'t create the portfolio. Try again.');
+      }
+    }
+  }
+
+  /// A project from a backup file (images go back onto this computer).
+  Future<void> _import(BuildContext context, WidgetRef ref) async {
+    final pb = ref.read(pbBridgeProvider);
+    final picked = await pb.invoke('backup', 'pick');
+    if (!context.mounted) return;
+    if (!picked.ok) {
+      showMessage(context, picked.errorMessage!);
+      return;
+    }
+    if (picked.value == null) return;
+    final v = jsonMap(picked.value);
+    final uid = ref.read(authUserProvider).value!.uid;
+    try {
+      final id = await ref
+          .read(projectRepositoryProvider)
+          .createFromBackup(uid: uid, project: jsonMap(v['project']));
+      await pb.invoke('backup', 'restoreFiles', [v['token'] as String, id]);
+      if (context.mounted) context.go('/p/$id');
+    } on ProjectLimitReached catch (e) {
+      if (context.mounted) showMessage(context, e.toString());
+    } catch (_) {
+      if (context.mounted) {
+        showMessage(context, 'This backup couldn\'t be imported.');
       }
     }
   }
@@ -79,6 +108,15 @@ class DashboardPage extends ConsumerWidget {
                           style: Theme.of(context).textTheme.bodyMedium,
                         ),
                         const SizedBox(width: 16),
+                        TextButton.icon(
+                          key: const Key('import-backup'),
+                          onPressed: atLimit
+                              ? null
+                              : () => _import(context, ref),
+                          icon: const Icon(Icons.upload_file),
+                          label: const Text('Import backup'),
+                        ),
+                        const SizedBox(width: 8),
                         FilledButton.icon(
                           key: const Key('new-project'),
                           onPressed: atLimit
@@ -233,17 +271,7 @@ class _ProjectCard extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Expanded(
-              child: Container(
-                color: theme.colorScheme.surfaceContainerHighest,
-                alignment: Alignment.center,
-                child: Icon(
-                  Icons.web_asset,
-                  size: 40,
-                  color: theme.colorScheme.outline,
-                ),
-              ),
-            ),
+            Expanded(child: _Thumbnail(doc: doc)),
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 12, 4, 12),
               child: Row(
@@ -295,6 +323,108 @@ class _ProjectCard extends ConsumerWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// A small picture of the site in its own colours (no rendering needed).
+class _Thumbnail extends StatelessWidget {
+  const _Thumbnail({required this.doc});
+  final ProjectDoc doc;
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final t = doc.spec?.theme;
+    if (t == null) {
+      return Container(
+        color: theme.colorScheme.surfaceContainerHighest,
+        alignment: Alignment.center,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.web_asset, size: 36, color: theme.colorScheme.outline),
+            const SizedBox(height: 4),
+            Text('Setup not finished', style: theme.textTheme.bodySmall),
+          ],
+        ),
+      );
+    }
+    final c = t.colorMode == ColorMode.DARK ? t.colors.dark : t.colors.light;
+    Color hex(String h) =>
+        Color(0xff000000 | (int.tryParse(h.substring(1), radix: 16) ?? 0));
+    final p = doc.content.profile;
+    return Stack(
+      children: [
+        Positioned.fill(
+          child: Container(
+            color: hex(c.background),
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(width: 28, height: 4, color: hex(c.primary)),
+                const SizedBox(height: 10),
+                Text(
+                  p.name.isEmpty ? doc.name : p.name,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: theme.textTheme.titleMedium?.copyWith(
+                    color: hex(c.text),
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                if (p.headline.isNotEmpty)
+                  Text(
+                    p.headline,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: theme.textTheme.bodySmall?.copyWith(
+                      color: hex(c.muted),
+                    ),
+                  ),
+                const Spacer(),
+                Row(
+                  children: [
+                    for (final x in [c.surface, c.surface, c.surface])
+                      Expanded(
+                        child: Container(
+                          height: 22,
+                          margin: const EdgeInsets.only(right: 6),
+                          decoration: BoxDecoration(
+                            color: hex(x),
+                            border: Border.all(color: hex(c.border)),
+                            borderRadius: BorderRadius.circular(
+                              (t.radius / 3).clamp(0, 8),
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (doc.score != null)
+          Positioned(
+            top: 8,
+            right: 8,
+            child: Tooltip(
+              message: 'Portfolio score',
+              child: CircleAvatar(
+                radius: 15,
+                backgroundColor: theme.colorScheme.surface,
+                child: Text(
+                  '${doc.score}',
+                  style: theme.textTheme.labelMedium?.copyWith(
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ),
+          ),
+      ],
     );
   }
 }

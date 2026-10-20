@@ -11,6 +11,8 @@ class PortfolioBuilderApp extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     ref.watch(deviceUserProvider);
+    // Keeps the user document (AI choice, project count) loaded for every screen.
+    ref.listen(userDocProvider, (_, _) {});
     return MaterialApp.router(
       title: 'Portfolio Builder',
       debugShowCheckedModeBanner: false,

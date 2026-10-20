@@ -117,7 +117,17 @@ export const SECTION_CATALOG: Record<SectionType, SectionInfo> = {
       { id: 'form', label: 'Form' },
     ],
   },
+  custom: {
+    label: 'Custom',
+    defaultTitle: '',
+    variants: [{ id: 'custom', label: 'Custom code' }],
+  },
 };
+
+/** Section types people can add from the library (custom ones come from code or the assistant). */
+export const LIBRARY_TYPES = (Object.keys(SECTION_CATALOG) as SectionType[]).filter(
+  (t) => t !== 'custom',
+);
 
 export const NAV_VARIANTS: VariantInfo[] = [
   { id: 'top', label: 'Top bar' },

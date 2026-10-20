@@ -139,8 +139,21 @@ describe('projects', () => {
       await assertFails(deleteDoc(doc(alice(), 'projects/p1')));
     });
     it('allows immutable version snapshots for the owner only', async () => {
-      const v = { source: 'manual', createdAt: 2, summary: 'Saved' };
+      const v = { source: 'manual', createdAt: 2, summary: 'Saved', snapshot: '{}' };
       await assertSucceeds(setDoc(doc(alice(), 'projects/p1/versions/v1'), v));
+      await assertSucceeds(
+        setDoc(doc(alice(), 'projects/p1/versions/v2'), {
+          ...v,
+          source: 'assistant',
+          prompt: 'warmer',
+        }),
+      );
+      await assertFails(
+        setDoc(doc(alice(), 'projects/p1/versions/v3'), { ...v, snapshot: { a: 1 } }),
+      );
+      await assertFails(setDoc(doc(alice(), 'projects/p1/versions/v4'), { ...v, extra: true }));
+      await assertFails(setDoc(doc(alice(), 'projects/p1/versions/v5'), { ...v, source: 'hack' }));
+      await assertFails(setDoc(doc(bob(), 'projects/p1/versions/v6'), v));
       await assertFails(updateDoc(doc(alice(), 'projects/p1/versions/v1'), { summary: 'x' }));
       await assertFails(getDoc(doc(bob(), 'projects/p1/versions/v1')));
     });

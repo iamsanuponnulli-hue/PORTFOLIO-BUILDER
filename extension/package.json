@@ -1,0 +1,17 @@
+{
+  "name": "@pb/extension",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Companion browser extension (Chrome, Edge): captures reference sites, reads blog feeds and checks links for the app.",
+  "scripts": {
+    "build": "node scripts/build.mjs",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/chrome": "^0.1.4",
+    "esbuild": "^0.28.2",
+    "fflate": "^0.8.2"
+  }
+}

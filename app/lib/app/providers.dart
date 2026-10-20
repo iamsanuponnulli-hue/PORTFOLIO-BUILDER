@@ -8,6 +8,7 @@ import '../features/account/account_service.dart';
 import '../features/account/user_repository.dart';
 import '../features/auth/auth_repository.dart';
 import '../features/dashboard/project_repository.dart';
+import '../features/versions/version_repository.dart';
 import '../models/generated/models.dart';
 
 // Infrastructure — overridden in tests.
@@ -33,6 +34,10 @@ final projectRepositoryProvider = Provider<ProjectRepository>(
     ref.watch(firestoreProvider),
     ref.watch(templatesProvider),
   ),
+);
+
+final versionRepositoryProvider = Provider<VersionRepository>(
+  (ref) => VersionRepository(ref.watch(firestoreProvider)),
 );
 
 final accountServiceProvider = Provider<AccountService>(

@@ -8,7 +8,8 @@ import '../features/auth/auth_repository.dart';
 import '../features/auth/sign_in_page.dart';
 import '../features/auth/verify_email_page.dart';
 import '../features/dashboard/dashboard_page.dart';
-import '../features/preview/preview_page.dart';
+import '../features/design/directions_page.dart';
+import '../features/editor/editor_page.dart';
 import '../features/settings/settings_page.dart';
 import '../features/setup/setup_page.dart';
 import 'providers.dart';
@@ -76,7 +77,12 @@ final routerProvider = Provider<GoRouter>((ref) {
       GoRoute(
         path: '/p/:id',
         builder: (_, state) =>
-            PreviewPage(projectId: state.pathParameters['id']!),
+            EditorPage(projectId: state.pathParameters['id']!),
+      ),
+      GoRoute(
+        path: '/p/:id/designs',
+        builder: (_, state) =>
+            DirectionsPage(projectId: state.pathParameters['id']!),
       ),
       // Not nested under /p/:id: each page owns the only open session.
       GoRoute(

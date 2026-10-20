@@ -1,5 +1,6 @@
 import { behavioursJs } from './behaviours.ts';
 import { checkSite } from './checks.ts';
+import { EDITOR_CSS, editorScript } from './preview.ts';
 import { BASE_CSS, SECTION_CSS } from './css.ts';
 import { selfHostedFontFaces } from './fonts.ts';
 import { esc, slugify } from './html.ts';
@@ -37,6 +38,7 @@ function makeCtx(
     state,
     opts,
     section,
+    root,
     title: sectionTitle(section),
     edit: (path) => (editable ? ` data-pb-edit="content:${esc(path)}"` : ''),
     editOption: (key) => (editable ? ` data-pb-edit="option:${esc(section.id)}:${esc(key)}"` : ''),
@@ -157,11 +159,22 @@ function customSectionCss(state: SiteState): string {
   return css.length ? `\n/* Custom sections */\n${css.join('\n')}\n` : '';
 }
 
+export interface PreviewOptions {
+  /** Adds inline editing, section selection and in-preview page links. */
+  editor?: boolean;
+  /** Extra markup added at the end of <body> (e.g. the full-check runner). */
+  bodyEnd?: string;
+}
+
 /**
  * One self-contained HTML document for the editor's sandboxed preview iframe:
  * stylesheets and scripts are inlined because the iframe has no site folder.
  */
-export function previewDocument(files: SiteFiles, page = 'index.html'): string {
+export function previewDocument(
+  files: SiteFiles,
+  page = 'index.html',
+  options: PreviewOptions = {},
+): string {
   let html = files[page] ?? '';
   const inline = (path: string) => (files[path] ?? '').replace(/<\/(style|script)/gi, '<\\/$1');
   html = html.replace(
@@ -170,8 +183,15 @@ export function previewDocument(files: SiteFiles, page = 'index.html'): string {
   );
   html = html.replace(
     /<script src="(?:\.\.\/)?(assets\/js\/[a-z]+\.js)" defer><\/script>/g,
-    (_m, p: string) =>
-      files[p]?.trim() ? `<script>window.__PB_PREVIEW__=true;\n${inline(p)}</script>` : '',
+    (_m, p: string) => (files[p]?.trim() ? `<script>${inline(p)}</script>` : ''),
   );
-  return html;
+  // Set before any site script runs, so forms know not to send anything.
+  html = html.replace('<head>', '<head>\n<script>window.__PB_PREVIEW__=true;</script>');
+  let tail = '';
+  if (options.editor) {
+    html = html.replace('</head>', `<style>${EDITOR_CSS}</style>\n</head>`);
+    tail += `<script>${editorScript(page)}</script>\n`;
+  }
+  if (options.bodyEnd) tail += options.bodyEnd;
+  return tail ? html.replace(/<\/body>(?![\s\S]*<\/body>)/, `${tail}</body>`) : html;
 }

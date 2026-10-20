@@ -664,6 +664,20 @@ browsers in a web app, against those services' terms, and brittle); Playwright i
 the web app (a web page can't control a browser, WASM or not); a Starter AI allowance,
 Cloud Functions and Cloud Storage (all cost money or need a card — can be added later).
 
+**Decided while building Phases 3–7:**
+- **Code editor: CodeMirror 6, not Monaco.** Monaco is several MB per load; CodeMirror
+  is ~550 KB, loaded only in code mode, which matters on the 360 MB/day free hosting.
+- **Extension messaging through a relay content script** on the app's own domains,
+  instead of `externally_connectable`, so it works without knowing the extension id
+  (unpacked and store builds have different ids). Domains come from `PB_APP_ORIGINS`.
+- **Version snapshots are one JSON string** per version document (no per-field indexes,
+  stays under Firestore's 1 MiB and 20k-index-entry limits).
+- **Versions are saved on design choice, accepted assistant changes, restore and
+  "Save version"**, not on every autosave (keeps within the free write allowance).
+  Undo/redo covers every edit within a session.
+- **Without an AI, designs come from built-in styles** shaped by tone, colour wishes and
+  inspiration; fixes (alt text, meta description) use plain rules.
+
 **Still open (decide during Phase 2, not blocking):**
 1. Which free providers to feature first in the "Connect a free AI" screen (verify
    their current limits and data-use terms at that time).

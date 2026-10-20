@@ -15,7 +15,7 @@ export interface FileRecord {
   key: string;
   projectId: string;
   fileId: string;
-  kind: 'image' | 'resume';
+  kind: 'image' | 'resume' | 'inspiration';
   mediaType: string;
   blob: Blob;
   /** Resized variants for images, keyed by width. */
@@ -36,11 +36,24 @@ export interface DraftRecord {
   savedAt: number;
 }
 
+/** AI use per month, provider and model (from the providers' usage fields). */
+export interface UsageRecord {
+  /** `${month}|${provider}|${model}` */
+  key: string;
+  month: string;
+  provider: string;
+  model: string;
+  requests: number;
+  inputTokens: number;
+  outputTokens: number;
+}
+
 interface PbDB extends DBSchema {
   meta: { key: string; value: CryptoKey };
   keys: { key: string; value: KeyRecord };
   files: { key: string; value: FileRecord; indexes: { byProject: string } };
   drafts: { key: string; value: DraftRecord };
+  usage: { key: string; value: UsageRecord };
 }
 
 export type Db = IDBPDatabase<PbDB>;
@@ -55,12 +68,15 @@ export function openStore(name = NAME): Promise<Db> {
 }
 
 function open(name: string) {
-  return openDB<PbDB>(name, 1, {
-    upgrade(db) {
-      db.createObjectStore('meta');
-      db.createObjectStore('keys', { keyPath: 'provider' });
-      db.createObjectStore('files', { keyPath: 'key' }).createIndex('byProject', 'projectId');
-      db.createObjectStore('drafts', { keyPath: 'projectId' });
+  return openDB<PbDB>(name, 2, {
+    upgrade(db, oldVersion) {
+      if (oldVersion < 1) {
+        db.createObjectStore('meta');
+        db.createObjectStore('keys', { keyPath: 'provider' });
+        db.createObjectStore('files', { keyPath: 'key' }).createIndex('byProject', 'projectId');
+        db.createObjectStore('drafts', { keyPath: 'projectId' });
+      }
+      if (oldVersion < 2) db.createObjectStore('usage', { keyPath: 'key' });
     },
   });
 }

@@ -34,5 +34,42 @@
   "contactForm": {
     "service": "none",
     "value": ""
+  },
+  "brief": {
+    "palette": [],
+    "background": "light",
+    "fonts": {
+      "heading": "",
+      "body": ""
+    },
+    "layout": [],
+    "mood": [],
+    "density": "comfortable",
+    "radius": 8
+  },
+  "inspiration": {
+    "id": "i1",
+    "source": "gallery",
+    "url": "",
+    "title": "",
+    "brief": {
+      "palette": [],
+      "background": "light",
+      "fonts": {
+        "heading": "",
+        "body": ""
+      },
+      "layout": [],
+      "mood": [],
+      "density": "comfortable",
+      "radius": 8
+    },
+    "borrow": {
+      "colors": true,
+      "fonts": true,
+      "layout": false,
+      "mood": true
+    },
+    "screenshots": []
   }
 }

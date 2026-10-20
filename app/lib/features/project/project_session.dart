@@ -6,7 +6,7 @@ import '../../models/generated/models.dart';
 import '../dashboard/project_repository.dart';
 import 'drafts.dart';
 
-enum SyncState { synced, savedOnDevice, syncing, conflict, offline }
+enum SyncState { synced, savedOnDevice, syncing, conflict, offline, dailyLimit }
 
 /// One open project, saved local-first: every edit is kept on this device at once,
 /// and synced to Firestore at most every [syncEvery] (and on [flush]) to stay
@@ -51,7 +51,7 @@ class ProjectSession extends ChangeNotifier {
     final draft = await drafts.get(projectId);
     if (draft != null) {
       if (draft.baseRevision == _baseRevision) {
-        _doc = ProjectDoc.fromJson({...entry.doc.toJson(), ...draft.data});
+        _doc = parseProject({...entry.doc.toJson(), ...draft.data});
         restoredDraft = true;
         _sync = SyncState.savedOnDevice;
         _schedule();
@@ -102,6 +102,12 @@ class ProjectSession extends ChangeNotifier {
       }
     } on StaleWrite {
       _sync = SyncState.conflict;
+    } on DailyLimitReached {
+      // Firestore's free daily writes are used up: keep everything on this
+      // device and try again in an hour (the allowance resets daily).
+      _sync = SyncState.dailyLimit;
+      _timer?.cancel();
+      _timer = Timer(const Duration(hours: 1), () => unawaited(flush()));
     } catch (_) {
       _sync = SyncState.offline;
       _schedule();
@@ -128,18 +134,7 @@ class ProjectSession extends ChangeNotifier {
 
   static Map<String, dynamic> _editable(ProjectDoc d) {
     final j = d.toJson();
-    return {
-      for (final k in [
-        'name',
-        'status',
-        'goals',
-        'content',
-        'spec',
-        'custom',
-        'contactForm',
-      ])
-        k: j[k],
-    };
+    return {for (final k in editableFields) k: j[k]};
   }
 
   @override

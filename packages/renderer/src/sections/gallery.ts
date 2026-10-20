@@ -1,5 +1,5 @@
 import { esc } from '../html.ts';
-import { img, wrap, type SectionRenderer } from './shared.ts';
+import { assetUrl, img, wrap, type SectionRenderer } from './shared.ts';
 
 /** Shows every project image, each opening full size in a lightbox. */
 export const gallery: SectionRenderer = {
@@ -20,7 +20,7 @@ export const gallery: SectionRenderer = {
         });
         const caption = `<figcaption>${esc(im.alt || p.title)}</figcaption>`;
         return a
-          ? `<li class="pb-reveal"><figure><a href="${esc(a.src)}" data-pb-lightbox aria-label="Open image: ${esc(im.alt || p.title)}">${inner}</a>${caption}</figure></li>`
+          ? `<li class="pb-reveal"><figure><a href="${esc(assetUrl(ctx, a.src))}" data-pb-lightbox aria-label="Open image: ${esc(im.alt || p.title)}">${inner}</a>${caption}</figure></li>`
           : `<li class="pb-reveal"><figure>${inner}${caption}</figure></li>`;
       })
       .join('');

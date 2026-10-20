@@ -81,12 +81,20 @@ service cloud.firestore {
           && get(/databases/$(database)/documents/projects/$(pid)).data.ownerId == request.auth.uid;
       }
 
-      // Versions are immutable snapshots (metadata here, body in Storage).
+      // Versions are immutable snapshots; the snapshot is one JSON string (≤ 900 KB).
+      // The app keeps the 30 newest (keep in sync with LIMITS.maxVersionsPerProject).
       match /versions/{vid} {
         allow read: if ownsParent();
         allow create: if ownsParent() && verified()
-          && request.resource.data.source in ['generate', 'manual', 'assistant', 'regenerate', 'import']
-          && request.resource.data.createdAt is int;
+          && request.resource.data.keys().hasOnly(['source', 'createdAt', 'summary', 'prompt', 'snapshot'])
+          && request.resource.data.source in ['generate', 'manual', 'assistant', 'regenerate', 'import', 'restore']
+          && request.resource.data.createdAt is int
+          && request.resource.data.snapshot is string
+          && request.resource.data.snapshot.size() <= 900000
+          && request.resource.data.get('summary', '') is string
+          && request.resource.data.get('summary', '').size() <= 500
+          && request.resource.data.get('prompt', '') is string
+          && request.resource.data.get('prompt', '').size() <= 2000;
         allow update: if false;
         allow delete: if ownsParent();
       }

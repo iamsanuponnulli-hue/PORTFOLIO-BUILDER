@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { LIMITS } from './limits.ts';
 import { PortfolioContent } from './content.ts';
 import { CustomCode, ProfileType, SiteSpec } from './spec.ts';
+import { Inspiration } from './design.ts';
 
 export const ProjectStatus = z
   .enum(['draft', 'generating', 'choosing', 'editing', 'exported'])
@@ -36,6 +37,9 @@ export const ProjectDoc = z
     spec: SiteSpec.nullish(),
     custom: CustomCode.default(CustomCode.parse({})),
     contactForm: ContactForm.default(ContactForm.parse({})),
+    inspiration: z.array(Inspiration).max(LIMITS.maxInspirationPerProject).default([]),
+    /** Latest portfolio score (0–100), shown on the dashboard. */
+    score: z.number().int().min(0).max(100).nullish(),
     currentVersionId: z.string().nullish(),
     revision: z.number().int().min(0).default(0),
     createdAt: z.number().int(),

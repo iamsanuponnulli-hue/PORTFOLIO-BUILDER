@@ -1,0 +1,14 @@
+[
+  {
+    "id": "dev-senior",
+    "text": "JANE DOE\nSenior Software Engineer · Lisbon, Portugal · jane@example.com · github.com/janedoe\n\nSUMMARY\nEngineer with 8 years building web products. I care about performance and accessibility.\n\nEXPERIENCE\nBrightcart — Senior Software Engineer (Jan 2022 – Present)\n- Led the checkout rewrite that cut page load time from 4.1s to 1.3s.\n- Mentored 4 engineers.\nNorthwind Labs — Software Engineer (2017 – 2021)\n- Built the internal design system used by 12 teams.\n\nPROJECTS\nTidepool — offline-first notes app (TypeScript, IndexedDB) tidepool.dev\n\nSKILLS\nLanguages: TypeScript, Go, SQL\nTools: React, PostgreSQL, Docker\n\nEDUCATION\nUniversity of Lisbon — BSc Computer Science, 2017"
+  },
+  {
+    "id": "designer",
+    "text": "Sam Lee — Product Designer\nsam@lee.design · Berlin\n\nWork\nKite Health, Lead Product Designer, 2021–now\n• Redesigned onboarding; completion went from 54% to 81%.\n• Set up the design critique practice.\nStudio Nord, Designer, 2018–2021\n• Brand and web projects for 30+ clients.\n\nAwards\nRed Dot Award 2020 — Kite app\n\nSkills: Figma, prototyping, user research, design systems"
+  },
+  {
+    "id": "student",
+    "text": "Priya Nair\nComputer Science student, University of Leeds (expected 2027)\npriya.nair@example.com\n\nProjects\n- RailMap: live UK train map built with Python and Leaflet.\n- Hackathon winner, LeedsHack 2025 (team of 3).\n\nExperience\nSummer intern, Sky (2025): wrote tests for the TV guide API.\n\nSkills: Python, Java, JavaScript, Git"
+  }
+]

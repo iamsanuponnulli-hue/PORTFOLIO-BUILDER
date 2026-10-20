@@ -21,3 +21,8 @@ app/web/js/
 .idea/
 .vscode/
 .gallery/
+
+# Extension build output
+extension/dist/
+extension/*.zip
+evals/report.md

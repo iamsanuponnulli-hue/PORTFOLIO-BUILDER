@@ -32,6 +32,36 @@ const resumeReply = JSON.stringify({
   ],
   skills: [{ group: 'Skills', items: ['TypeScript', 'Go', 'SQL'] }],
 });
+const directionsReply = JSON.stringify({
+  directions: [
+    {
+      name: 'Calm grid',
+      description: 'Soft and quiet',
+      preset: 'calm',
+      sections: [
+        { type: 'hero', variant: 'split' },
+        { type: 'projects', variant: 'grid' },
+        { type: 'contact', variant: 'simple' },
+      ],
+    },
+    { name: 'Bold type', preset: 'bold', colors: { light: { text: '#eeeeee' } } },
+    { name: 'Warm split', preset: 'warm', fonts: { heading: 'Georgia' } },
+  ],
+});
+const assistantReply = JSON.stringify({
+  summary: 'Rounder corners and testimonials after projects.',
+  operations: [
+    { op: 'updateTheme', tokens: { radius: 20 } },
+    { op: 'addSection', type: 'testimonials', variant: 'grid', index: 3 },
+    { op: 'setVariant', id: 'nope', variant: 'grid' },
+  ],
+});
+const replyFor = (body: string) =>
+  body.includes('three distinct design directions')
+    ? directionsReply
+    : body.includes('by returning a list of operations')
+      ? assistantReply
+      : resumeReply;
 const seen: string[] = [];
 
 const server = createServer((req, res) => {
@@ -64,7 +94,7 @@ const server = createServer((req, res) => {
           choices: [
             {
               index: 0,
-              message: { role: 'assistant', content: resumeReply },
+              message: { role: 'assistant', content: replyFor(body) },
               finish_reason: 'stop',
             },
           ],
@@ -96,7 +126,10 @@ const base = `http://127.0.0.1:${(server.address() as { port: number }).port}`;
 const browser = await chromium.launch(
   process.env.PW_CHROMIUM ? { executablePath: process.env.PW_CHROMIUM } : {},
 );
-const page = await browser.newPage();
+const context = await browser.newContext({ acceptDownloads: true });
+// Font downloads are answered locally so the test doesn't depend on Google Fonts.
+await context.route('https://fonts.googleapis.com/**', (r) => r.fulfill({ status: 503, body: '' }));
+const page = await context.newPage();
 const errors: string[] = [];
 page.on('pageerror', (e) => errors.push(e.message));
 await page.goto(base + '/');
@@ -184,6 +217,230 @@ check(
 // Rendering in the worker still works alongside everything else.
 const spec = JSON.parse((await page.evaluate(`pb.worker.defaultSpec('developer')`)) as string);
 check('default design loads', spec.sections?.length > 3, spec);
+
+// ---- Design, editing, export (Phases 3–6) ----
+const content = {
+  profile: {
+    name: 'Jane Doe',
+    headline: 'Engineer',
+    tagline: 'I build fast web apps.',
+    bio: 'I build things.',
+    location: '',
+    email: 'jane@example.com',
+    socials: [],
+    photo: { assetId: 'photo', alt: 'Jane' },
+  },
+  experience: [
+    {
+      id: 'e1',
+      company: 'Brightcart',
+      role: 'Engineer',
+      start: '2022',
+      end: 'Present',
+      location: '',
+      bullets: ['Cut load time.'],
+      tech: [],
+    },
+  ],
+  projects: [
+    {
+      id: 'p1',
+      title: 'Tidepool',
+      summary: 'Notes app',
+      role: '',
+      tech: ['TS'],
+      links: [],
+      images: [],
+      tags: [],
+      featured: false,
+    },
+  ],
+  skills: [{ group: 'Skills', items: ['TypeScript'] }],
+  education: [],
+  certifications: [],
+  awards: [],
+  writing: [],
+  testimonials: [],
+};
+const state = {
+  content,
+  spec,
+  custom: { css: '', js: '', sections: {} },
+  contactForm: { service: 'none', value: '' },
+};
+const S = JSON.stringify(JSON.stringify(state));
+
+const curated = await pb(`pb.site.directions('designer', '{"tone":"bold"}', '[]', 0)`);
+check(
+  'three designs without AI',
+  curated.ok && curated.value.length === 3 && curated.value[0].name === 'Bold',
+  curated,
+);
+
+const aiDirs = await pb(
+  `pb.ai.directions('custom', 'mock-large', ${JSON.stringify(JSON.stringify({ profileType: 'developer', goals: {}, state, inspiration: [] }))})`,
+);
+check(
+  'AI designs are validated into readable specs',
+  aiDirs.ok &&
+    aiDirs.value.directions.length === 3 &&
+    aiDirs.value.directions[0].spec.sections[0].variant === 'split' &&
+    aiDirs.value.directions[2].spec.theme.fonts.heading === 'Fraunces',
+  aiDirs,
+);
+
+const proposal = await pb(
+  `pb.ai.assistant('custom', 'mock-large', ${JSON.stringify(JSON.stringify({ prompt: 'rounder, add testimonials', state }))})`,
+);
+check(
+  'assistant proposal keeps changes that fit and lists them',
+  proposal.ok &&
+    proposal.value.operations.length === 2 &&
+    proposal.value.skipped.length === 1 &&
+    proposal.value.changes.includes('Added section: Kind words') &&
+    proposal.value.state.spec.theme.radius === 20,
+  proposal,
+);
+
+const usage = await pb(`pb.usage.list()`);
+check(
+  'AI usage is counted on this device',
+  usage.ok && usage.value.some((u: { requests: number }) => u.requests >= 2),
+  usage,
+);
+
+const preview = JSON.parse(
+  (await page.evaluate(`pb.worker.render(${S}, '{"mode":"preview","editable":true}')`)) as string,
+);
+const editorDoc = (await page.evaluate(
+  (f) =>
+    (
+      window as unknown as { pb: { previewDocument(a: string, b: string, c: boolean): string } }
+    ).pb.previewDocument(f, 'index.html', true),
+  JSON.stringify(preview.files),
+)) as string;
+check(
+  'editor preview has inline editing',
+  editorDoc.includes('data-pb-edit') && editorDoc.includes("pb:'select'"),
+  editorDoc.length,
+);
+
+const exported = JSON.parse(
+  (await page.evaluate(`pb.worker.render(${S}, '{"mode":"export"}')`)) as string,
+);
+const html: string = exported.files['index.html'];
+const edited = html.replace('<section id="about"', '<section data-mine="1" id="about"');
+const code = await pb(`pb.site.codeEdit(${JSON.stringify(html)}, ${JSON.stringify(edited)}, ${S})`);
+check(
+  'code mode turns an edited section into custom code',
+  code.ok && code.value.converted?.[0] === 'about',
+  code,
+);
+const broken = await pb(
+  `pb.site.codeEdit(${JSON.stringify(html)}, ${JSON.stringify(html.replace('<title>', '<title>x'))}, ${S})`,
+);
+check(
+  'code mode refuses edits outside sections, with a line',
+  broken.ok && broken.value.error?.line > 1,
+  broken,
+);
+
+const full = await pb(`pb.checks.full(${JSON.stringify(JSON.stringify(exported.files))})`);
+check(
+  'full checks run axe at three widths',
+  full.ok &&
+    full.value.widths.length === 3 &&
+    full.value.widths.every(
+      (w: { overflow: boolean; axe: unknown[] }) => !w.overflow && Array.isArray(w.axe),
+    ),
+  full,
+);
+const score = await pb(`pb.site.score('p1', ${S}, ${JSON.stringify(JSON.stringify(full.value))})`);
+check('portfolio score is computed', score.ok && score.value.full && score.value.total > 50, score);
+
+const zipDownload = page.waitForEvent('download');
+const zipped = await pb(`pb.export.zip('p1', ${S}, false)`);
+const dl = await zipDownload;
+check(
+  'site ZIP is built and downloaded',
+  zipped.ok && dl.suggestedFilename() === 'jane-doe-portfolio.zip' && zipped.value.files > 6,
+  zipped,
+);
+check(
+  'missing fonts are explained',
+  zipped.value?.notes?.[0]?.includes('Fonts'),
+  zipped.value?.notes,
+);
+const { unzipSync } = await import('fflate');
+const zipBytes = readFileSync((await dl.path())!);
+const entries = Object.keys(unzipSync(new Uint8Array(zipBytes)));
+check(
+  'ZIP has the site, the photo and a README',
+  ['index.html', 'README.md', 'favicon.ico', 'og-image.png'].every((f) => entries.includes(f)) &&
+    entries.some((e) => e.startsWith('assets/img/photo')),
+  entries,
+);
+
+const backupDownload = page.waitForEvent('download');
+const backed = await pb(
+  `pb.backup.download('p1', ${JSON.stringify(JSON.stringify({ name: 'Jane', content }))}, 'Jane Doe')`,
+);
+const backupFile = await (await backupDownload).path();
+check('backup is downloaded', backed.ok && backed.value.bytes > 100, backed);
+const backupChooser = page.waitForEvent('filechooser');
+const picked = page.evaluate(`pb.backup.pick()`) as Promise<string>;
+await (await backupChooser).setFiles(backupFile!);
+const opened: R = JSON.parse(await picked);
+check(
+  'backup opens with its project and files',
+  opened.ok && opened.value.project.name === 'Jane' && opened.value.files >= 2,
+  opened,
+);
+const restored = await pb(`pb.backup.restoreFiles('${opened.value?.token}', 'p2')`);
+const p2 = await pb(`pb.files.previewAssets('p2')`);
+check(
+  'backup images are restored for another project',
+  restored.ok && String(p2.value?.photo?.src).startsWith('blob:'),
+  { restored, p2 },
+);
+
+const shotChooser = page.waitForEvent('filechooser');
+const shots = page.evaluate(`pb.inspiration.upload('p1')`) as Promise<string>;
+await (await shotChooser).setFiles({ name: 'site.png', mimeType: 'image/png', buffer: png });
+const uploaded: R = JSON.parse(await shots);
+check(
+  'uploaded screenshots give a palette',
+  uploaded.ok &&
+    uploaded.value[0].brief.palette.length >= 1 &&
+    uploaded.value[0].source === 'upload',
+  uploaded,
+);
+const noExt = await pb(`pb.inspiration.capture('p1', 'https://example.com')`);
+check(
+  'capture without the extension says so',
+  !noExt.ok && noExt.error?.code === 'no_extension',
+  noExt,
+);
+
+const editorText = await page.evaluate(async () => {
+  const pbx = (
+    window as unknown as {
+      pb: {
+        code: {
+          mount(e: HTMLElement, t: string, l: string, r: boolean, d: boolean): Promise<number>;
+          getText(i: number): string;
+          setText(i: number, t: string): void;
+        };
+      };
+    }
+  ).pb;
+  const host = document.createElement('div');
+  document.body.appendChild(host);
+  const id = await pbx.code.mount(host, 'body { color: red; }', 'css', false, false);
+  pbx.code.setText(id, 'p {}');
+  return pbx.code.getText(id) + '|' + (host.querySelector('.cm-editor') ? 'mounted' : 'missing');
+});
+check('code editor loads on demand', editorText === 'p {}|mounted', editorText);
 
 // Device data is removed on sign-out.
 await pb(`pb.clearDevice()`);

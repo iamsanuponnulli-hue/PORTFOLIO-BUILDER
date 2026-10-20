@@ -9,12 +9,14 @@ import '../project/project_session.dart';
 import 'steps/content_step.dart';
 import 'steps/goals_step.dart';
 import 'steps/import_step.dart';
+import 'steps/inspiration_step.dart';
 import 'steps/review_step.dart';
 
 enum SetupStep {
   import('Import', 'Bring in what you have'),
   content('Content', 'Check and complete'),
   goals('Goals', 'What the site is for'),
+  inspiration('Inspiration', 'Sites and styles you like'),
   review('Review', 'Create your site');
 
   const SetupStep(this.label, this.blurb);
@@ -116,6 +118,10 @@ class _SetupPageState extends ConsumerState<SetupPage> {
                           ),
                           SetupStep.goals => GoalsStep(
                             session: session,
+                            onNext: () => go(SetupStep.inspiration),
+                          ),
+                          SetupStep.inspiration => InspirationStep(
+                            session: session,
                             onNext: () => go(SetupStep.review),
                           ),
                           SetupStep.review => ReviewStep(
@@ -194,6 +200,10 @@ class SyncIndicator extends StatelessWidget {
         'Offline · will sync later',
       ),
       SyncState.conflict => (Icons.warning_amber_outlined, 'Changed elsewhere'),
+      SyncState.dailyLimit => (
+        Icons.cloud_off_outlined,
+        'Saved here · syncs tomorrow',
+      ),
     };
     // Fixed width so the toolbar doesn't shift as the status changes.
     return SizedBox(

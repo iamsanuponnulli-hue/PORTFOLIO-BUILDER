@@ -26,6 +26,8 @@ function actions(ctx: Ctx): string {
       `<a class="pb-btn" href="${esc(safeUrl('mailto:' + ctx.state.content.profile.email))}">Email me</a>`,
     );
   }
+  if (ctx.opts.resume)
+    btns.push(`<a class="pb-btn" href="${ctx.root}resume.pdf" download>Download resume</a>`);
   return btns.length ? `<div class="pb-actions">${btns.join('')}</div>` : '';
 }
 

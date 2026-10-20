@@ -15,6 +15,29 @@ class StaleWrite implements Exception {
   const StaleWrite();
 }
 
+/// Firestore's free daily write allowance is used up: edits stay on this device.
+class DailyLimitReached implements Exception {
+  const DailyLimitReached();
+}
+
+/// Project fields the app edits (synced from this device to Firestore).
+const editableFields = [
+  'name',
+  'status',
+  'goals',
+  'content',
+  'spec',
+  'custom',
+  'contactForm',
+  'inspiration',
+  'score',
+  'currentVersionId',
+];
+
+/// Reads a stored project, filling fields added after it was created.
+ProjectDoc parseProject(Map<String, dynamic> data) =>
+    ProjectDoc.fromJson({'inspiration': const <Object>[], ...data});
+
 class ProjectLimitReached implements Exception {
   const ProjectLimitReached(this.limit);
   final int limit;
@@ -51,8 +74,7 @@ class ProjectRepository {
       .snapshots()
       .map(
         (q) => [
-          for (final d in q.docs)
-            ProjectEntry(d.id, ProjectDoc.fromJson(d.data())),
+          for (final d in q.docs) ProjectEntry(d.id, parseProject(d.data())),
         ],
       );
 
@@ -61,14 +83,14 @@ class ProjectRepository {
       .snapshots()
       .map(
         (s) => s.exists && s.data() != null
-            ? ProjectEntry(s.id, ProjectDoc.fromJson(s.data()!))
+            ? ProjectEntry(s.id, parseProject(s.data()!))
             : null,
       );
 
   Future<ProjectEntry?> get(String id) async {
     final s = await _projects.doc(id).get();
     return s.exists && s.data() != null
-        ? ProjectEntry(s.id, ProjectDoc.fromJson(s.data()!))
+        ? ProjectEntry(s.id, parseProject(s.data()!))
         : null;
   }
 
@@ -87,6 +109,7 @@ class ProjectRepository {
       'content': _templates.content,
       'custom': _templates.custom,
       'contactForm': _templates.contactForm,
+      'inspiration': <Object>[],
       'revision': 0,
       'createdAt': now,
       'updatedAt': now,
@@ -110,6 +133,35 @@ class ProjectRepository {
     return _insert(uid, json);
   }
 
+  /// A new project from a backup file's project fields (images are restored separately).
+  Future<String> createFromBackup({
+    required String uid,
+    required Map<String, dynamic> project,
+  }) {
+    final now = _now;
+    final name = (project['name'] as String? ?? '').trim();
+    final data = <String, dynamic>{
+      'ownerId': uid,
+      'name': name.isEmpty
+          ? 'Imported portfolio'
+          : (name.length > 80 ? name.substring(0, 80) : name),
+      'profileType': project['profileType'] ?? 'developer',
+      'status': project['spec'] == null ? 'draft' : 'editing',
+      'goals': project['goals'] ?? _templates.goals,
+      'content': project['content'] ?? _templates.content,
+      'custom': project['custom'] ?? _templates.custom,
+      'contactForm': project['contactForm'] ?? _templates.contactForm,
+      'inspiration': project['inspiration'] ?? <Object>[],
+      if (project['spec'] != null) 'spec': project['spec'],
+      'revision': 0,
+      'createdAt': now,
+      'updatedAt': now,
+    };
+    // Validates the shape before anything is written.
+    parseProject(data);
+    return _insert(uid, data);
+  }
+
   Future<void> rename(ProjectEntry entry, String name) =>
       _projects.doc(entry.id).update({
         'name': name.trim(),
@@ -124,21 +176,13 @@ class ProjectRepository {
     final j = doc.toJson();
     try {
       await _projects.doc(id).update({
-        for (final k in [
-          'name',
-          'status',
-          'goals',
-          'content',
-          'spec',
-          'custom',
-          'contactForm',
-        ])
-          k: j[k],
+        for (final k in editableFields) k: j[k],
         'revision': revision,
         'updatedAt': _now,
       });
     } on FirebaseException catch (e) {
       if (e.code == 'permission-denied') throw const StaleWrite();
+      if (e.code == 'resource-exhausted') throw const DailyLimitReached();
       rethrow;
     }
     return revision;

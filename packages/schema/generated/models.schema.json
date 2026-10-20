@@ -8,11 +8,15 @@
     },
     "userDoc": {
       "$ref": "#/definitions/UserDoc"
+    },
+    "versionDoc": {
+      "$ref": "#/definitions/VersionDoc"
     }
   },
   "required": [
     "projectDoc",
-    "userDoc"
+    "userDoc",
+    "versionDoc"
   ],
   "additionalProperties": false,
   "definitions": {
@@ -108,6 +112,26 @@
             }
           ]
         },
+        "inspiration": {
+          "default": [],
+          "maxItems": 3,
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/Inspiration"
+          }
+        },
+        "score": {
+          "anyOf": [
+            {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 100
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "currentVersionId": {
           "type": [
             "string",
@@ -140,6 +164,7 @@
         "content",
         "custom",
         "contactForm",
+        "inspiration",
         "revision",
         "createdAt",
         "updatedAt"
@@ -988,7 +1013,8 @@
         "writing",
         "testimonials",
         "gallery",
-        "contact"
+        "contact",
+        "custom"
       ]
     },
     "SeoSpec": {
@@ -1103,6 +1129,206 @@
       ],
       "additionalProperties": false
     },
+    "Inspiration": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128
+        },
+        "source": {
+          "$ref": "#/definitions/InspirationSource"
+        },
+        "url": {
+          "default": "",
+          "type": "string",
+          "maxLength": 2048
+        },
+        "title": {
+          "default": "",
+          "type": "string",
+          "maxLength": 160
+        },
+        "brief": {
+          "default": {
+            "palette": [],
+            "background": "light",
+            "fonts": {
+              "heading": "",
+              "body": ""
+            },
+            "layout": [],
+            "mood": [],
+            "density": "comfortable",
+            "radius": 8
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/DesignBrief"
+            }
+          ]
+        },
+        "borrow": {
+          "default": {
+            "colors": true,
+            "fonts": true,
+            "layout": false,
+            "mood": true
+          },
+          "allOf": [
+            {
+              "$ref": "#/definitions/Borrow"
+            }
+          ]
+        },
+        "screenshots": {
+          "default": [],
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 128
+          }
+        }
+      },
+      "required": [
+        "id",
+        "source",
+        "url",
+        "title",
+        "brief",
+        "borrow",
+        "screenshots"
+      ],
+      "additionalProperties": false
+    },
+    "InspirationSource": {
+      "type": "string",
+      "enum": [
+        "extension",
+        "upload",
+        "gallery"
+      ]
+    },
+    "DesignBrief": {
+      "type": "object",
+      "properties": {
+        "palette": {
+          "default": [],
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^#[0-9a-fA-F]{6}$"
+          }
+        },
+        "background": {
+          "default": "light",
+          "type": "string",
+          "enum": [
+            "light",
+            "dark"
+          ]
+        },
+        "fonts": {
+          "default": {
+            "heading": "",
+            "body": ""
+          },
+          "type": "object",
+          "properties": {
+            "heading": {
+              "default": "",
+              "type": "string",
+              "maxLength": 60
+            },
+            "body": {
+              "default": "",
+              "type": "string",
+              "maxLength": 60
+            }
+          },
+          "required": [
+            "heading",
+            "body"
+          ],
+          "additionalProperties": false
+        },
+        "layout": {
+          "default": [],
+          "maxItems": 8,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 60
+          }
+        },
+        "mood": {
+          "default": [],
+          "maxItems": 6,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 30
+          }
+        },
+        "density": {
+          "default": "comfortable",
+          "type": "string",
+          "enum": [
+            "compact",
+            "comfortable",
+            "roomy"
+          ]
+        },
+        "radius": {
+          "default": 8,
+          "type": "number",
+          "minimum": 0,
+          "maximum": 32
+        }
+      },
+      "required": [
+        "palette",
+        "background",
+        "fonts",
+        "layout",
+        "mood",
+        "density",
+        "radius"
+      ],
+      "additionalProperties": false
+    },
+    "Borrow": {
+      "type": "object",
+      "properties": {
+        "colors": {
+          "default": true,
+          "type": "boolean"
+        },
+        "fonts": {
+          "default": true,
+          "type": "boolean"
+        },
+        "layout": {
+          "default": false,
+          "type": "boolean"
+        },
+        "mood": {
+          "default": true,
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "colors",
+        "fonts",
+        "layout",
+        "mood"
+      ],
+      "additionalProperties": false
+    },
     "UserDoc": {
       "type": "object",
       "properties": {
@@ -1197,6 +1423,52 @@
         "model"
       ],
       "additionalProperties": false
+    },
+    "VersionDoc": {
+      "type": "object",
+      "properties": {
+        "createdAt": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "source": {
+          "$ref": "#/definitions/VersionSource"
+        },
+        "summary": {
+          "default": "",
+          "type": "string",
+          "maxLength": 500
+        },
+        "prompt": {
+          "default": "",
+          "type": "string",
+          "maxLength": 2000
+        },
+        "snapshot": {
+          "type": "string",
+          "maxLength": 900000
+        }
+      },
+      "required": [
+        "createdAt",
+        "source",
+        "summary",
+        "prompt",
+        "snapshot"
+      ],
+      "additionalProperties": false
+    },
+    "VersionSource": {
+      "type": "string",
+      "enum": [
+        "generate",
+        "manual",
+        "assistant",
+        "regenerate",
+        "import",
+        "restore"
+      ]
     }
   }
 }

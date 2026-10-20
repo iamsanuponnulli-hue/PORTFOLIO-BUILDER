@@ -18,7 +18,7 @@ const ContactFormPatch = z
   })
   .partial();
 
-/** Every change to a site is one of these. Expanded alongside the renderer in Phase 1. */
+/** Every change to a site is one of these: from panels, code mode, the assistant and fixes. */
 export const Operation = z.discriminatedUnion('op', [
   z.object({ op: z.literal('updateContent'), path: z.string(), value: z.unknown() }),
   z.object({ op: z.literal('addItem'), path: z.string(), item: z.unknown() }),
@@ -47,6 +47,14 @@ export const Operation = z.discriminatedUnion('op', [
     js: z.string().optional(),
   }),
   z.object({ op: z.literal('revertToManaged'), id: Id }),
+  z.object({
+    op: z.literal('addCustomSection'),
+    index: z.number().int().min(0),
+    title: z.string().max(80).optional(),
+    html: z.string(),
+    css: z.string().optional(),
+    js: z.string().optional(),
+  }),
   z.object({
     op: z.literal('editCustomCode'),
     file: z.enum(['custom.css', 'custom.js']),

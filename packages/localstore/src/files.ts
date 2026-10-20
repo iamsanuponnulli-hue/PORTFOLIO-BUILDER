@@ -1,4 +1,4 @@
-import type { Db, DraftRecord, FileRecord } from './db.ts';
+import type { Db, DraftRecord, FileRecord, UsageRecord } from './db.ts';
 
 export type NewFile = Omit<FileRecord, 'key' | 'createdAt'>;
 
@@ -72,5 +72,38 @@ export class DraftStore {
 
   remove(projectId: string): Promise<void> {
     return this.db.delete('drafts', projectId);
+  }
+}
+
+/** AI requests and tokens per month, provider and model, counted on this device. */
+export class UsageStore {
+  constructor(private readonly db: Db) {}
+
+  async record(
+    provider: string,
+    model: string,
+    usage: { inputTokens?: number; outputTokens?: number },
+    now = new Date(),
+  ): Promise<void> {
+    const month = now.toISOString().slice(0, 7);
+    const key = `${month}|${provider}|${model}`;
+    const tx = this.db.transaction('usage', 'readwrite');
+    const prev = await tx.store.get(key);
+    await tx.store.put({
+      key,
+      month,
+      provider,
+      model,
+      requests: (prev?.requests ?? 0) + 1,
+      inputTokens: (prev?.inputTokens ?? 0) + (usage.inputTokens ?? 0),
+      outputTokens: (prev?.outputTokens ?? 0) + (usage.outputTokens ?? 0),
+    });
+    await tx.done;
+  }
+
+  /** Newest month first. */
+  async list(): Promise<UsageRecord[]> {
+    const all = await this.db.getAll('usage');
+    return all.sort((a, b) => b.month.localeCompare(a.month) || b.requests - a.requests);
   }
 }

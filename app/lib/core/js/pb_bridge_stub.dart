@@ -25,8 +25,19 @@ class _UnavailableBridge implements PbBridge {
   Future<String> render(String stateJson, String optionsJson) =>
       Future.error(const PbUnavailable());
   @override
-  String previewDocument(String filesJson, [String page = 'index.html']) =>
-      throw const PbUnavailable();
+  String previewDocument(
+    String filesJson, [
+    String page = 'index.html',
+    bool editor = false,
+  ]) => throw const PbUnavailable();
+  @override
+  String prefsGet(String key) => '';
+  @override
+  void prefsSet(String key, String value) {}
+  @override
+  String extensionVersion() => '';
+  @override
+  String catalogJson() => '{}';
   @override
   void setUser(String uid) {}
   @override

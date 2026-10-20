@@ -72,7 +72,7 @@ void main() {
     final t = loadTemplates();
     final content = jsonDecode(jsonEncode(t.content)) as Map<String, dynamic>;
     (content['profile'] as Map)['name'] = name;
-    return ProjectDoc.fromJson({
+    return parseProject({
       'ownerId': 'alice',
       'name': 'Jane',
       'profileType': 'developer',

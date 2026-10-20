@@ -10,16 +10,19 @@ import {
   CustomCode,
   Goals,
   ContactForm,
+  DesignBrief,
+  Inspiration,
   PortfolioContent,
   ProjectDoc,
   UserDoc,
+  VersionDoc,
 } from '../src/index.ts';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const outDir = resolve(here, '../generated');
 mkdirSync(outDir, { recursive: true });
 
-const roots = z.object({ projectDoc: ProjectDoc, userDoc: UserDoc });
+const roots = z.object({ projectDoc: ProjectDoc, userDoc: UserDoc, versionDoc: VersionDoc });
 const schema = {
   title: 'PortfolioBuilderModels',
   ...z.toJSONSchema(roots, { io: 'output', unrepresentable: 'any', target: 'draft-7' }),
@@ -31,6 +34,8 @@ const templates = {
   goals: Goals.parse({}),
   custom: CustomCode.parse({}),
   contactForm: ContactForm.parse({}),
+  brief: DesignBrief.parse({}),
+  inspiration: Inspiration.parse({ id: 'i1', source: 'gallery' }),
 };
 writeFileSync(resolve(outDir, 'templates.json'), JSON.stringify(templates, null, 2) + '\n');
 console.log('wrote', outDir);

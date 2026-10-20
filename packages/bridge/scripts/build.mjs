@@ -4,6 +4,8 @@
  *  - worker/: the background worker as ES modules with code splitting, so the
  *    PDF and Word readers load only when a resume is imported
  *  - pdf.worker.min.mjs: pdf.js's own worker
+ *  - editor/: the code editor (CodeMirror), loaded when code mode opens
+ *  - axe.min.js: the accessibility checker for the full portfolio checks
  */
 import { build } from 'esbuild';
 import { copyFileSync, mkdirSync, rmSync } from 'node:fs';
@@ -40,8 +42,17 @@ await build({
   chunkNames: 'chunks/[name]-[hash]',
 });
 
+await build({
+  ...common,
+  entryPoints: { editor: resolve(here, '../src/editor.ts') },
+  format: 'esm',
+  outdir: resolve(out, 'editor'),
+});
+
 const require = createRequire(resolve(here, '../../imports/package.json'));
 copyFileSync(
   require.resolve('pdfjs-dist/build/pdf.worker.min.mjs'),
   resolve(out, 'pdf.worker.min.mjs'),
 );
+const requireChecks = createRequire(resolve(here, '../../checks/package.json'));
+copyFileSync(requireChecks.resolve('axe-core/axe.min.js'), resolve(out, 'axe.min.js'));

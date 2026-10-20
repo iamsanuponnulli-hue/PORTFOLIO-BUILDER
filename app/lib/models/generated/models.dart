@@ -13,29 +13,35 @@ String portfolioBuilderModelsToJson(PortfolioBuilderModels data) => json.encode(
 class PortfolioBuilderModels {
     final ProjectDoc projectDoc;
     final UserDoc userDoc;
+    final VersionDoc versionDoc;
 
     PortfolioBuilderModels({
         required this.projectDoc,
         required this.userDoc,
+        required this.versionDoc,
     });
 
     PortfolioBuilderModels copyWith({
         ProjectDoc? projectDoc,
         UserDoc? userDoc,
+        VersionDoc? versionDoc,
     }) => 
         PortfolioBuilderModels(
             projectDoc: projectDoc ?? this.projectDoc,
             userDoc: userDoc ?? this.userDoc,
+            versionDoc: versionDoc ?? this.versionDoc,
         );
 
     factory PortfolioBuilderModels.fromJson(Map<String, dynamic> json) => PortfolioBuilderModels(
         projectDoc: ProjectDoc.fromJson(json["projectDoc"]),
         userDoc: UserDoc.fromJson(json["userDoc"]),
+        versionDoc: VersionDoc.fromJson(json["versionDoc"]),
     );
 
     Map<String, dynamic> toJson() => {
         "projectDoc": projectDoc.toJson(),
         "userDoc": userDoc.toJson(),
+        "versionDoc": versionDoc.toJson(),
     };
 }
 
@@ -46,10 +52,12 @@ class ProjectDoc {
     final String? currentVersionId;
     final CustomCode custom;
     final Goals goals;
+    final List<Inspiration> inspiration;
     final String name;
     final String ownerId;
     final ProfileType profileType;
     final int revision;
+    final int? score;
     final SiteSpec? spec;
     final ProjectStatus status;
     final int updatedAt;
@@ -61,10 +69,12 @@ class ProjectDoc {
         this.currentVersionId,
         required this.custom,
         required this.goals,
+        required this.inspiration,
         required this.name,
         required this.ownerId,
         required this.profileType,
         required this.revision,
+        this.score,
         this.spec,
         required this.status,
         required this.updatedAt,
@@ -77,10 +87,12 @@ class ProjectDoc {
         String? currentVersionId,
         CustomCode? custom,
         Goals? goals,
+        List<Inspiration>? inspiration,
         String? name,
         String? ownerId,
         ProfileType? profileType,
         int? revision,
+        int? score,
         SiteSpec? spec,
         ProjectStatus? status,
         int? updatedAt,
@@ -92,10 +104,12 @@ class ProjectDoc {
             currentVersionId: currentVersionId ?? this.currentVersionId,
             custom: custom ?? this.custom,
             goals: goals ?? this.goals,
+            inspiration: inspiration ?? this.inspiration,
             name: name ?? this.name,
             ownerId: ownerId ?? this.ownerId,
             profileType: profileType ?? this.profileType,
             revision: revision ?? this.revision,
+            score: score ?? this.score,
             spec: spec ?? this.spec,
             status: status ?? this.status,
             updatedAt: updatedAt ?? this.updatedAt,
@@ -108,10 +122,12 @@ class ProjectDoc {
         currentVersionId: json["currentVersionId"],
         custom: CustomCode.fromJson(json["custom"]),
         goals: Goals.fromJson(json["goals"]),
+        inspiration: List<Inspiration>.from(json["inspiration"].map((x) => Inspiration.fromJson(x))),
         name: json["name"],
         ownerId: json["ownerId"],
         profileType: profileTypeValues.map[json["profileType"]]!,
         revision: json["revision"],
+        score: json["score"],
         spec: json["spec"] == null ? null : SiteSpec.fromJson(json["spec"]),
         status: projectStatusValues.map[json["status"]]!,
         updatedAt: json["updatedAt"],
@@ -124,10 +140,12 @@ class ProjectDoc {
         "currentVersionId": currentVersionId,
         "custom": custom.toJson(),
         "goals": goals.toJson(),
+        "inspiration": List<dynamic>.from(inspiration.map((x) => x.toJson())),
         "name": name,
         "ownerId": ownerId,
         "profileType": profileTypeValues.reverse[profileType],
         "revision": revision,
+        "score": score,
         "spec": spec?.toJson(),
         "status": projectStatusValues.reverse[status],
         "updatedAt": updatedAt,
@@ -903,6 +921,228 @@ final toneValues = EnumValues({
     "technical": Tone.TECHNICAL
 });
 
+class Inspiration {
+    final Borrow borrow;
+    final DesignBrief brief;
+    final String id;
+    final List<String> screenshots;
+    final InspirationSource source;
+    final String title;
+    final String url;
+
+    Inspiration({
+        required this.borrow,
+        required this.brief,
+        required this.id,
+        required this.screenshots,
+        required this.source,
+        required this.title,
+        required this.url,
+    });
+
+    Inspiration copyWith({
+        Borrow? borrow,
+        DesignBrief? brief,
+        String? id,
+        List<String>? screenshots,
+        InspirationSource? source,
+        String? title,
+        String? url,
+    }) => 
+        Inspiration(
+            borrow: borrow ?? this.borrow,
+            brief: brief ?? this.brief,
+            id: id ?? this.id,
+            screenshots: screenshots ?? this.screenshots,
+            source: source ?? this.source,
+            title: title ?? this.title,
+            url: url ?? this.url,
+        );
+
+    factory Inspiration.fromJson(Map<String, dynamic> json) => Inspiration(
+        borrow: Borrow.fromJson(json["borrow"]),
+        brief: DesignBrief.fromJson(json["brief"]),
+        id: json["id"],
+        screenshots: List<String>.from(json["screenshots"].map((x) => x)),
+        source: inspirationSourceValues.map[json["source"]]!,
+        title: json["title"],
+        url: json["url"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "borrow": borrow.toJson(),
+        "brief": brief.toJson(),
+        "id": id,
+        "screenshots": List<dynamic>.from(screenshots.map((x) => x)),
+        "source": inspirationSourceValues.reverse[source],
+        "title": title,
+        "url": url,
+    };
+}
+
+class Borrow {
+    final bool colors;
+    final bool fonts;
+    final bool layout;
+    final bool mood;
+
+    Borrow({
+        required this.colors,
+        required this.fonts,
+        required this.layout,
+        required this.mood,
+    });
+
+    Borrow copyWith({
+        bool? colors,
+        bool? fonts,
+        bool? layout,
+        bool? mood,
+    }) => 
+        Borrow(
+            colors: colors ?? this.colors,
+            fonts: fonts ?? this.fonts,
+            layout: layout ?? this.layout,
+            mood: mood ?? this.mood,
+        );
+
+    factory Borrow.fromJson(Map<String, dynamic> json) => Borrow(
+        colors: json["colors"],
+        fonts: json["fonts"],
+        layout: json["layout"],
+        mood: json["mood"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "colors": colors,
+        "fonts": fonts,
+        "layout": layout,
+        "mood": mood,
+    };
+}
+
+class DesignBrief {
+    final Background background;
+    final Density density;
+    final BriefFonts fonts;
+    final List<String> layout;
+    final List<String> mood;
+    final List<String> palette;
+    final double radius;
+
+    DesignBrief({
+        required this.background,
+        required this.density,
+        required this.fonts,
+        required this.layout,
+        required this.mood,
+        required this.palette,
+        required this.radius,
+    });
+
+    DesignBrief copyWith({
+        Background? background,
+        Density? density,
+        BriefFonts? fonts,
+        List<String>? layout,
+        List<String>? mood,
+        List<String>? palette,
+        double? radius,
+    }) => 
+        DesignBrief(
+            background: background ?? this.background,
+            density: density ?? this.density,
+            fonts: fonts ?? this.fonts,
+            layout: layout ?? this.layout,
+            mood: mood ?? this.mood,
+            palette: palette ?? this.palette,
+            radius: radius ?? this.radius,
+        );
+
+    factory DesignBrief.fromJson(Map<String, dynamic> json) => DesignBrief(
+        background: backgroundValues.map[json["background"]]!,
+        density: densityValues.map[json["density"]]!,
+        fonts: BriefFonts.fromJson(json["fonts"]),
+        layout: List<String>.from(json["layout"].map((x) => x)),
+        mood: List<String>.from(json["mood"].map((x) => x)),
+        palette: List<String>.from(json["palette"].map((x) => x)),
+        radius: json["radius"]?.toDouble(),
+    );
+
+    Map<String, dynamic> toJson() => {
+        "background": backgroundValues.reverse[background],
+        "density": densityValues.reverse[density],
+        "fonts": fonts.toJson(),
+        "layout": List<dynamic>.from(layout.map((x) => x)),
+        "mood": List<dynamic>.from(mood.map((x) => x)),
+        "palette": List<dynamic>.from(palette.map((x) => x)),
+        "radius": radius,
+    };
+}
+
+enum Background {
+    DARK,
+    LIGHT
+}
+
+final backgroundValues = EnumValues({
+    "dark": Background.DARK,
+    "light": Background.LIGHT
+});
+
+enum Density {
+    COMFORTABLE,
+    COMPACT,
+    ROOMY
+}
+
+final densityValues = EnumValues({
+    "comfortable": Density.COMFORTABLE,
+    "compact": Density.COMPACT,
+    "roomy": Density.ROOMY
+});
+
+class BriefFonts {
+    final String body;
+    final String heading;
+
+    BriefFonts({
+        required this.body,
+        required this.heading,
+    });
+
+    BriefFonts copyWith({
+        String? body,
+        String? heading,
+    }) => 
+        BriefFonts(
+            body: body ?? this.body,
+            heading: heading ?? this.heading,
+        );
+
+    factory BriefFonts.fromJson(Map<String, dynamic> json) => BriefFonts(
+        body: json["body"],
+        heading: json["heading"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "body": body,
+        "heading": heading,
+    };
+}
+
+enum InspirationSource {
+    EXTENSION,
+    GALLERY,
+    UPLOAD
+}
+
+final inspirationSourceValues = EnumValues({
+    "extension": InspirationSource.EXTENSION,
+    "gallery": InspirationSource.GALLERY,
+    "upload": InspirationSource.UPLOAD
+});
+
 enum ProfileType {
     DESIGNER,
     DEVELOPER,
@@ -1068,6 +1308,7 @@ enum SectionType {
     AWARDS,
     CERTIFICATIONS,
     CONTACT,
+    CUSTOM,
     EDUCATION,
     EXPERIENCE,
     GALLERY,
@@ -1083,6 +1324,7 @@ final sectionTypeValues = EnumValues({
     "awards": SectionType.AWARDS,
     "certifications": SectionType.CERTIFICATIONS,
     "contact": SectionType.CONTACT,
+    "custom": SectionType.CUSTOM,
     "education": SectionType.EDUCATION,
     "experience": SectionType.EXPERIENCE,
     "gallery": SectionType.GALLERY,
@@ -1138,7 +1380,7 @@ class ThemeTokens {
     final ColorMode colorMode;
     final Colors colors;
     final Density density;
-    final Fonts fonts;
+    final ThemeFonts fonts;
     final Motion motion;
     final double radius;
     final double scale;
@@ -1161,7 +1403,7 @@ class ThemeTokens {
         ColorMode? colorMode,
         Colors? colors,
         Density? density,
-        Fonts? fonts,
+        ThemeFonts? fonts,
         Motion? motion,
         double? radius,
         double? scale,
@@ -1184,7 +1426,7 @@ class ThemeTokens {
         colorMode: colorModeValues.map[json["colorMode"]]!,
         colors: Colors.fromJson(json["colors"]),
         density: densityValues.map[json["density"]]!,
-        fonts: Fonts.fromJson(json["fonts"]),
+        fonts: ThemeFonts.fromJson(json["fonts"]),
         motion: motionValues.map[json["motion"]]!,
         radius: json["radius"]?.toDouble(),
         scale: json["scale"]?.toDouble(),
@@ -1293,41 +1535,29 @@ class ColorSet {
     };
 }
 
-enum Density {
-    COMFORTABLE,
-    COMPACT,
-    ROOMY
-}
-
-final densityValues = EnumValues({
-    "comfortable": Density.COMFORTABLE,
-    "compact": Density.COMPACT,
-    "roomy": Density.ROOMY
-});
-
-class Fonts {
+class ThemeFonts {
     final String body;
     final String heading;
     final String mono;
 
-    Fonts({
+    ThemeFonts({
         required this.body,
         required this.heading,
         required this.mono,
     });
 
-    Fonts copyWith({
+    ThemeFonts copyWith({
         String? body,
         String? heading,
         String? mono,
     }) => 
-        Fonts(
+        ThemeFonts(
             body: body ?? this.body,
             heading: heading ?? this.heading,
             mono: mono ?? this.mono,
         );
 
-    factory Fonts.fromJson(Map<String, dynamic> json) => Fonts(
+    factory ThemeFonts.fromJson(Map<String, dynamic> json) => ThemeFonts(
         body: json["body"],
         heading: json["heading"],
         mono: json["mono"],
@@ -1490,6 +1720,71 @@ class ModelChoice {
         "provider": provider,
     };
 }
+
+class VersionDoc {
+    final int createdAt;
+    final String prompt;
+    final String snapshot;
+    final VersionSource source;
+    final String summary;
+
+    VersionDoc({
+        required this.createdAt,
+        required this.prompt,
+        required this.snapshot,
+        required this.source,
+        required this.summary,
+    });
+
+    VersionDoc copyWith({
+        int? createdAt,
+        String? prompt,
+        String? snapshot,
+        VersionSource? source,
+        String? summary,
+    }) => 
+        VersionDoc(
+            createdAt: createdAt ?? this.createdAt,
+            prompt: prompt ?? this.prompt,
+            snapshot: snapshot ?? this.snapshot,
+            source: source ?? this.source,
+            summary: summary ?? this.summary,
+        );
+
+    factory VersionDoc.fromJson(Map<String, dynamic> json) => VersionDoc(
+        createdAt: json["createdAt"],
+        prompt: json["prompt"],
+        snapshot: json["snapshot"],
+        source: versionSourceValues.map[json["source"]]!,
+        summary: json["summary"],
+    );
+
+    Map<String, dynamic> toJson() => {
+        "createdAt": createdAt,
+        "prompt": prompt,
+        "snapshot": snapshot,
+        "source": versionSourceValues.reverse[source],
+        "summary": summary,
+    };
+}
+
+enum VersionSource {
+    ASSISTANT,
+    GENERATE,
+    IMPORT,
+    MANUAL,
+    REGENERATE,
+    RESTORE
+}
+
+final versionSourceValues = EnumValues({
+    "assistant": VersionSource.ASSISTANT,
+    "generate": VersionSource.GENERATE,
+    "import": VersionSource.IMPORT,
+    "manual": VersionSource.MANUAL,
+    "regenerate": VersionSource.REGENERATE,
+    "restore": VersionSource.RESTORE
+});
 
 class EnumValues<T> {
     Map<String, T> map;

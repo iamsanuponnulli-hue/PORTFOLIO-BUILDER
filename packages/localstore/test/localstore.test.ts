@@ -95,6 +95,22 @@ describe('files and drafts', () => {
     expect(await s.drafts.get('p1')).toBeUndefined();
   });
 
+  it('counts AI usage per month and model', async () => {
+    const s = await fresh();
+    const oct = new Date('2026-10-05T10:00:00Z');
+    await s.usage.record('gemini', 'flash', { inputTokens: 100, outputTokens: 20 }, oct);
+    await s.usage.record('gemini', 'flash', { inputTokens: 50 }, oct);
+    await s.usage.record('groq', 'llama', {}, new Date('2026-09-01T00:00:00Z'));
+    const rows = await s.usage.list();
+    expect(rows[0]).toMatchObject({
+      month: '2026-10',
+      requests: 2,
+      inputTokens: 150,
+      outputTokens: 20,
+    });
+    expect(rows[1]!.month).toBe('2026-09');
+  });
+
   it('clears everything on sign-out', async () => {
     const s = await fresh();
     await s.keys.save({ provider: 'gemini', apiKey: 'k' });

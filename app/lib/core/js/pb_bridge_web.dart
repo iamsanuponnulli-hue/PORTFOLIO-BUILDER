@@ -10,9 +10,25 @@ extension type _PbApi._(JSObject _) implements JSObject {
   external String get version;
   external String ping();
   external _PbWorker get worker;
-  external String previewDocument(String filesJson, String page);
+  external String previewDocument(String filesJson, String page, bool editor);
   external void setUser(String uid);
   external _PbAi get ai;
+  external _PbPrefs get prefs;
+  external _PbExt get ext;
+  external _PbSite get site;
+}
+
+extension type _PbSite._(JSObject _) implements JSObject {
+  external String catalog();
+}
+
+extension type _PbPrefs._(JSObject _) implements JSObject {
+  external String get(String key);
+  external void set(String key, String value);
+}
+
+extension type _PbExt._(JSObject _) implements JSObject {
+  external String version();
 }
 
 extension type _PbAi._(JSObject _) implements JSObject {
@@ -75,8 +91,23 @@ class _WebBridge implements PbBridge {
       (await _api.worker.render(stateJson, optionsJson).toDart).toDart;
 
   @override
-  String previewDocument(String filesJson, [String page = 'index.html']) =>
-      _api.previewDocument(filesJson, page);
+  String previewDocument(
+    String filesJson, [
+    String page = 'index.html',
+    bool editor = false,
+  ]) => _api.previewDocument(filesJson, page, editor);
+
+  @override
+  String prefsGet(String key) => _pb?.prefs.get(key) ?? '';
+
+  @override
+  void prefsSet(String key, String value) => _pb?.prefs.set(key, value);
+
+  @override
+  String extensionVersion() => _pb?.ext.version() ?? '';
+
+  @override
+  String catalogJson() => _pb?.site.catalog() ?? '{}';
 
   @override
   void setUser(String uid) => _pb?.setUser(uid);

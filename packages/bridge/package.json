@@ -15,11 +15,21 @@
     "@pb/renderer": "workspace:*",
     "@pb/ai": "workspace:*",
     "@pb/imports": "workspace:*",
-    "@pb/localstore": "workspace:*"
+    "@pb/localstore": "workspace:*",
+    "@pb/export": "workspace:*",
+    "@pb/checks": "workspace:*",
+    "codemirror": "^6.0.2",
+    "@codemirror/lang-html": "^6.4.11",
+    "@codemirror/lang-css": "^6.3.1",
+    "@codemirror/lang-javascript": "^6.2.4",
+    "@codemirror/state": "^6.5.2",
+    "@codemirror/view": "^6.38.6",
+    "@codemirror/language": "^6.11.3"
   },
   "devDependencies": {
     "esbuild": "^0.28.2",
     "fake-indexeddb": "^6.2.5",
-    "playwright": "1.56.1"
+    "playwright": "1.56.1",
+    "fflate": "^0.8.2"
   }
 }

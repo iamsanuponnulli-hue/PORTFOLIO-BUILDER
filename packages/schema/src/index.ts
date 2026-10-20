@@ -5,3 +5,5 @@ export * from './spec.ts';
 export * from './project.ts';
 export * from './user.ts';
 export * from './operations.ts';
+export * from './design.ts';
+export * from './version.ts';

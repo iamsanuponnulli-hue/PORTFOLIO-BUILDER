@@ -7,19 +7,25 @@ HTML/CSS/JS as a ZIP.
 - **Plan:** [`PLAN.md`](PLAN.md)
 - **Architecture, screens and control flows:** [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
 
-**Status:** Phases 0, 1 and 2 are done.
+**Status:** the MVP (Phases 0–6) is built, plus the Phase 7 tooling.
 
 - Phase 0: sign-in, the dashboard, data rules and the browser-package bridge.
-- Phase 1: the site renderer — 12 section types with 2–4 layouts each, 6 theme
-  presets, default designs for the 4 profile types, case-study pages, contact forms,
-  SEO tags, instant checks, and the edit operations every change goes through.
-- Phase 2: connect your own AI (a free key, Sign in with OpenRouter, or any
-  OpenAI-compatible endpoint) and pick a model; the setup wizard — import a resume
-  (read by your AI) or GitHub repositories, check and complete the content, set goals,
-  then create the site; the live preview with device widths and design presets.
-  Edits are saved on this device at once and synced at most every 30 seconds.
-
-Design directions, the editor and the AI assistant come in Phases 3–5.
+- Phase 1: the site renderer — 12 section types with 2–4 layouts each (plus custom
+  sections), 6 theme presets, case-study pages, contact forms, SEO tags, instant checks.
+- Phase 2: connect your own AI, the setup wizard (resume, GitHub and blog imports),
+  local-first saving.
+- Phase 3: design directions — 3 designs from your AI, or without AI from built-in
+  styles; inspiration from reference sites (companion extension), uploaded screenshots
+  or a style gallery.
+- Phase 4: the editor — sections, theme, content and site panels; click-to-edit text in
+  the preview; code mode (CodeMirror) with custom sections; undo/redo; version history;
+  ZIP export and project backups, all built in the browser.
+- Phase 5: the AI assistant (prompt → previewed changes you accept or reject, custom
+  sections) and the content assistant (better wording, taglines, case-study interview).
+- Phase 6: the portfolio score (instant checks plus axe-core and layout at 3 widths)
+  with one-click fixes, the editor tour, and the daily free-quota state.
+- Phase 7: separate Smart/Fast models, recommended-model labels, usage per model, and
+  the cross-model eval runner in `evals/`.
 
 ## How it's built
 
@@ -35,8 +41,12 @@ packages/schema     Shared data definitions (zod) → JSON Schema → Dart model
 packages/renderer   Content + design spec → static HTML/CSS/JS site (pure, deterministic)
 packages/ai         AI calls with the user's own key (any provider), resume reading
 packages/imports    Resume text (PDF, Word), GitHub import, image resizing
-packages/localstore On-device storage: encrypted keys, images, unsynced edits
+packages/localstore On-device storage: encrypted keys, images, unsynced edits, AI usage
+packages/export     Site ZIP (fonts, favicon, share image, README) and project backups
+packages/checks     Portfolio score, one-click fixes, axe-core runner
 packages/bridge     Browser bundle exposed to Flutter as window.pb, plus a Web Worker
+extension/          Companion browser extension (Chrome, Edge): captures, feeds, links
+evals/              Cross-model evals (dev only, your own key)
 firebase/           Firestore security rules, with emulator tests
 docs/               Architecture and flows
 ```
@@ -82,6 +92,7 @@ pnpm typecheck
 pnpm test              # unit tests: schema, renderer, bridge
 pnpm test:emulator     # security rules against the Firestore emulator (needs Java)
 pnpm --filter @pb/renderer test:browser   # every layout × theme in Chromium: overflow + axe
+pnpm --filter @pb/bridge test:browser     # browser bundles end to end in Chromium (pnpm bridge first)
 pnpm --filter @pb/renderer gallery        # writes sample sites to packages/renderer/.gallery
 pnpm codegen           # regenerate Dart models after changing packages/schema
 
@@ -128,3 +139,27 @@ CI runs all of these on every pull request (`.github/workflows/ci.yml`).
 The app is then live at `https://<project-id>.web.app`. Nothing here needs a card or
 can be billed: when a free daily allowance runs out, Firebase pauses that service until
 the next day.
+
+## The companion extension
+
+Reading other sites (for inspiration) and most blog feeds needs the extension; the rest
+of the app works without it. Build it for your app's address and load it:
+
+```bash
+PB_APP_ORIGINS=https://<project-id>.web.app pnpm --filter @pb/extension build
+```
+
+Load `extension/dist` with "Load unpacked" (chrome://extensions, developer mode), or
+upload `extension/portfolio-builder-extension.zip` to the Edge Add-ons store
+(see `extension/STORE_LISTING.md`). Pass `--dart-define=EXTENSION_URL=<store link>`
+when building the app to show an "Install the extension" link.
+
+## Cross-model evals
+
+```bash
+PB_EVAL_PROVIDER=gemini PB_EVAL_KEY=<key> PB_EVAL_MODELS=gemini-2.5-flash \
+  pnpm --filter @pb/evals eval
+```
+
+Writes `evals/report.md`. Models that pass go on the recommended list in
+`packages/ai/src/models.ts`.

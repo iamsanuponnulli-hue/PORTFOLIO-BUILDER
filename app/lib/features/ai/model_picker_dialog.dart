@@ -66,6 +66,11 @@ class _ModelPickerState extends State<_ModelPicker> {
                 value: _freeOnly,
                 onChanged: (v) => setState(() => _freeOnly = v),
               ),
+            Text(
+              'Models without "Reads images" still work: inspiration uses page styles only, '
+              'and image descriptions are written from context.',
+              style: theme.textTheme.bodySmall,
+            ),
             const SizedBox(height: 8),
             Expanded(
               child: shown.isEmpty
@@ -87,11 +92,14 @@ class _ModelPickerState extends State<_ModelPicker> {
                               spacing: 6,
                               runSpacing: 4,
                               children: [
-                                if (m.id == widget.list.suggested)
+                                if (m.id == widget.list.suggested ||
+                                    m.recommended)
                                   _Badge(
                                     'Recommended',
                                     theme.colorScheme.primary,
-                                  ),
+                                  )
+                                else
+                                  _Badge('Untested', theme.colorScheme.outline),
                                 if (m.free)
                                   _Badge('Free', theme.colorScheme.tertiary),
                                 if (m.images)

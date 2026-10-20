@@ -31,6 +31,8 @@ export interface RenderOptions {
   assets?: Record<string, AssetInfo>;
   /** Where web fonts come from. Export bundles font files; preview may use Google Fonts. */
   fontSource?: 'self-hosted' | 'google' | 'system';
+  /** The site includes resume.pdf: the intro gets a download button. */
+  resume?: boolean;
   /** Fixed clock for deterministic output (footer year). */
   now?: Date;
 }

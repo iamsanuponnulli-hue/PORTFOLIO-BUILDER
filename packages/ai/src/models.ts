@@ -16,6 +16,35 @@ export interface ModelInfo {
   /** Costs nothing to call (free tier or a ":free" model). */
   free: boolean;
   capabilities: Capabilities;
+  /** recommended: known to work well for this app's tasks; untested: may still work. */
+  status: ModelStatus;
+}
+
+export type ModelStatus = 'recommended' | 'untested';
+
+/**
+ * Models we recommend (config, not code). A model joins this list once it passes the
+ * cross-model evals in evals/ for every task; others are offered as "untested".
+ */
+const RECOMMENDED: Partial<Record<ProviderId, RegExp[]>> = {
+  gemini: [/^gemini-(2\.5|[3-9][\d.]*)-(flash|pro)$/],
+  groq: [/gpt-oss-120b/, /llama-3\.3-70b/, /llama-4-maverick/],
+  openrouter: [
+    /gemini.*flash/,
+    /gpt-oss-120b/,
+    /llama-3\.3-70b/,
+    /deepseek-chat/,
+    /claude/,
+    /gpt-5/,
+  ],
+  anthropic: [/sonnet/, /haiku/, /opus/],
+  openai: [/^gpt-5/, /^gpt-4\.1/, /^gpt-4o/],
+  mistral: [/mistral-large/, /mistral-medium/],
+};
+
+export function modelStatus(provider: ProviderId, id: string): ModelStatus {
+  const m = id.toLowerCase();
+  return (RECOMMENDED[provider] ?? []).some((re) => re.test(m)) ? 'recommended' : 'untested';
 }
 
 /**
@@ -142,6 +171,7 @@ export async function listModels(
       label: r.label || r.id,
       free: !!r.free,
       capabilities: capabilitiesFor(c.provider, r.id),
+      status: modelStatus(c.provider, r.id),
     }))
     .sort((a, b) => a.label.localeCompare(b.label));
 }
@@ -160,6 +190,8 @@ export function suggestModel(provider: ProviderId, models: ModelInfo[]): ModelIn
   const pool = provider === 'openrouter' ? models.filter((m) => m.free) : models;
   for (const re of prefs[provider]) {
     const hits = pool.filter((m) => re.test(m.id) && m.capabilities.smart);
+    const rec = hits.filter((m) => m.status === 'recommended');
+    if (rec.length) return rec.sort((a, b) => b.id.localeCompare(a.id))[0];
     if (hits.length) return hits.sort((a, b) => b.id.localeCompare(a.id))[0];
   }
   return pool[0];

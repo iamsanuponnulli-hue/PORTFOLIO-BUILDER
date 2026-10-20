@@ -1,0 +1,10 @@
+[
+  { "prompt": "Make it warmer and friendlier", "expect": ["updateTheme"] },
+  { "prompt": "Use a dark theme", "expect": ["updateTheme"] },
+  { "prompt": "Put my projects first, right after the intro", "expect": ["moveSection"] },
+  { "prompt": "Add a testimonials section after projects", "expect": ["addSection"] },
+  { "prompt": "Hide the skills section", "expect": ["toggleSection", "removeSection"] },
+  { "prompt": "Show projects as a simple list", "expect": ["setVariant"] },
+  { "prompt": "Rename the experience section to Career", "expect": ["setSectionOptions"] },
+  { "prompt": "Rounder corners and more space between sections", "expect": ["updateTheme"] }
+]

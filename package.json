@@ -12,7 +12,7 @@
     "test:emulator": "pnpm -r run test:emulator",
     "lint": "eslint . && prettier --check .",
     "format": "prettier --write .",
-    "codegen": "pnpm --filter @pb/schema run codegen",
+    "codegen": "pnpm --filter @pb/schema run codegen && pnpm --filter @pb/renderer run catalog",
     "bridge": "pnpm --filter @pb/bridge run build",
     "emulators": "firebase emulators:start --only auth,firestore,hosting --project demo-portfolio-builder"
   },

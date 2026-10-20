@@ -1,3 +1,5 @@
 packages:
   - packages/*
   - firebase
+  - extension
+  - evals

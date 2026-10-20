@@ -20,6 +20,7 @@ export const SectionType = z
     'testimonials',
     'gallery',
     'contact',
+    'custom',
   ])
   .meta({ id: 'SectionType' });
 export type SectionType = z.infer<typeof SectionType>;

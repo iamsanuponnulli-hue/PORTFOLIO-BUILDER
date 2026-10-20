@@ -1,0 +1,17 @@
+{
+  "name": "@pb/evals",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Cross-model evals (dev only): runs every AI task against real models with your own key and scores the answers.",
+  "scripts": {
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "eval": "node --experimental-strip-types src/run.ts"
+  },
+  "dependencies": {
+    "@pb/ai": "workspace:*",
+    "@pb/renderer": "workspace:*",
+    "@pb/schema": "workspace:*"
+  }
+}

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   capabilitiesFor,
+  modelStatus,
   createPkce,
   exchangeOpenRouterCode,
   listModels,
@@ -83,6 +84,7 @@ describe('model suggestions and capabilities', () => {
       label: id,
       free,
       capabilities: capabilitiesFor('openrouter', id),
+      status: modelStatus('openrouter', id),
     });
     expect(
       suggestModel('openrouter', [
@@ -96,6 +98,7 @@ describe('model suggestions and capabilities', () => {
       label: id,
       free: true,
       capabilities: capabilitiesFor('gemini', id),
+      status: modelStatus('gemini', id),
     });
     expect(
       suggestModel('gemini', [
@@ -104,6 +107,12 @@ describe('model suggestions and capabilities', () => {
         g('gemini-2.5-pro'),
       ])!.id,
     ).toBe('gemini-2.5-flash');
+  });
+
+  it('labels recommended models', () => {
+    expect(modelStatus('gemini', 'gemini-2.5-flash')).toBe('recommended');
+    expect(modelStatus('gemini', 'gemini-2.0-flash-lite')).toBe('untested');
+    expect(modelStatus('custom', 'anything')).toBe('untested');
   });
 
   it('treats unknown models as text-only', () => {

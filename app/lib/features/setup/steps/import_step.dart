@@ -23,14 +23,79 @@ class ImportStep extends ConsumerStatefulWidget {
 
 class _ImportStepState extends ConsumerState<ImportStep> {
   final _github = TextEditingController();
+  final _feed = TextEditingController();
   String? _busy;
   String? _resumeNote;
   String? _githubNote;
+  String? _feedNote;
 
   @override
   void dispose() {
     _github.dispose();
+    _feed.dispose();
     super.dispose();
+  }
+
+  /// Blog posts become Writing items (new links only; edited ones are kept).
+  Future<void> _importFeed() async {
+    final url = _feed.text.trim();
+    if (url.isEmpty) {
+      setState(() => _feedNote = 'Enter your blog or dev.to address.');
+      return;
+    }
+    setState(() {
+      _busy = 'feed';
+      _feedNote = null;
+    });
+    try {
+      final r = await _pb.invoke('imports', 'feed', [url]);
+      final posts = jsonList(r.get<Object?>());
+      final writing = widget.session.doc!.content.writing;
+      final have = {for (final w in writing) w.url};
+      final ids = {for (final w in writing) w.id};
+      var n = writing.length;
+      final added = <SimpleItem>[];
+      for (final p in posts) {
+        final link = p['url'] as String? ?? '';
+        if (link.isEmpty || have.contains(link)) continue;
+        var id = 'w${++n}';
+        while (ids.contains(id)) {
+          id = 'w${++n}';
+        }
+        ids.add(id);
+        added.add(
+          SimpleItem(
+            id: id,
+            title: p['title'] as String? ?? link,
+            issuer: '',
+            date: p['date'] as String? ?? '',
+            url: link,
+            description: p['description'] as String? ?? '',
+          ),
+        );
+      }
+      widget.session.update(
+        (d) => d.copyWith(
+          content: d.content.copyWith(
+            writing: [...d.content.writing, ...added],
+          ),
+        ),
+      );
+      setState(
+        () => _feedNote = added.isEmpty
+            ? 'No new posts found.'
+            : 'Added ${added.length} post${added.length == 1 ? '' : 's'}.',
+      );
+    } on PbException catch (e) {
+      setState(
+        () => _feedNote = e.code == 'no_extension'
+            ? 'Reading this feed needs the Portfolio Builder extension (dev.to works without it). '
+                  'You can also add posts by hand on the next step.'
+            : e.message,
+      );
+    } finally {
+      if (mounted) setState(() => _busy = null);
+    }
   }
 
   PbBridge get _pb => ref.read(pbBridgeProvider);
@@ -216,6 +281,44 @@ class _ImportStepState extends ConsumerState<ImportStep> {
               if (_githubNote != null) ...[
                 const SizedBox(height: 12),
                 Text(_githubNote!, key: const Key('github-note')),
+              ],
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        SectionCard(
+          title: 'Blog',
+          subtitle:
+              'Your latest posts for a Writing section. dev.to works directly; other blogs '
+              '(Medium, Substack, your own) are read by the extension.',
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: TextField(
+                      key: const Key('feed-url'),
+                      controller: _feed,
+                      decoration: const InputDecoration(
+                        labelText: 'Blog or feed address',
+                        hintText:
+                            'e.g. dev.to/janedoe or janedoe.blog/feed.xml',
+                      ),
+                      onSubmitted: (_) => _importFeed(),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  OutlinedButton(
+                    key: const Key('import-feed'),
+                    onPressed: _busy != null ? null : _importFeed,
+                    child: Text(_busy == 'feed' ? 'Reading…' : 'Import'),
+                  ),
+                ],
+              ),
+              if (_feedNote != null) ...[
+                const SizedBox(height: 12),
+                Text(_feedNote!, key: const Key('feed-note')),
               ],
             ],
           ),

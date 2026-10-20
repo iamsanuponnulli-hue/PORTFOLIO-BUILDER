@@ -32,3 +32,21 @@ final readyAiProvider = FutureProvider<AiChoice?>((ref) async {
       ? AiChoice(smart.provider, smart.model)
       : null;
 });
+
+/// The model for a tier when its key is on this device, else null.
+/// In simple mode both tiers use the same model.
+final readyAiForTierProvider = FutureProvider.family<AiChoice?, AiTier>((
+  ref,
+  tier,
+) async {
+  final ai = (await ref.watch(userDocProvider.future))?.ai;
+  final pick = switch (tier) {
+    AiTier.smart => ai?.smart,
+    AiTier.fast => (ai?.simple ?? true) ? ai?.smart : (ai?.fast ?? ai?.smart),
+  };
+  if (pick == null) return null;
+  final keys = await ref.watch(savedKeysProvider.future);
+  return keys.any((k) => k.provider == pick.provider)
+      ? AiChoice(pick.provider, pick.model)
+      : null;
+});

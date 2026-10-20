@@ -27,7 +27,7 @@ jobs:
       - name: Generated Dart models are up to date
         run: |
           pnpm codegen
-          git diff --exit-code -- app/lib/models/generated app/assets/schema packages/schema/generated
+          git diff --exit-code -- app/lib/models/generated app/assets/schema packages/schema/generated app/test/fixtures/catalog.json
 
   emulator:
     name: Security rules (Firebase emulator)

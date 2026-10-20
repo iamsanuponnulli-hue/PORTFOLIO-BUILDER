@@ -61,7 +61,22 @@ abstract interface class PbBridge {
   Future<String> render(String stateJson, String optionsJson);
 
   /// One self-contained HTML document for the sandboxed preview iframe.
-  String previewDocument(String filesJson, [String page = 'index.html']);
+  /// With [editor], text can be edited inline and sections selected.
+  String previewDocument(
+    String filesJson, [
+    String page = 'index.html',
+    bool editor = false,
+  ]);
+
+  /// Small settings kept on this device for the signed-in user ('' when unset).
+  String prefsGet(String key);
+  void prefsSet(String key, String value);
+
+  /// Section types and layouts, presets and fonts (JSON; see Catalog).
+  String catalogJson();
+
+  /// The companion extension's version, or '' when it isn't installed.
+  String extensionVersion();
 
   /// Switches on-device storage to this user ('' after sign-out).
   void setUser(String uid);

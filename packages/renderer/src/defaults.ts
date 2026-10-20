@@ -262,6 +262,9 @@ const LAYOUTS: Record<
   },
 };
 
+/** The built-in theme a profile type starts with. */
+export const profilePreset = (profileType: ProfileType) => LAYOUTS[profileType].preset;
+
 /** A complete starting design for a profile type, optionally with another preset's theme. */
 export function defaultSpec(profileType: ProfileType, presetId?: string): SiteSpec {
   const layout = LAYOUTS[profileType];

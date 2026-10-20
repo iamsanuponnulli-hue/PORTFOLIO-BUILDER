@@ -14,7 +14,8 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run test",
     "test:browser": "node --experimental-strip-types test-browser/run.ts",
-    "gallery": "node --experimental-strip-types scripts/dev-gallery.ts"
+    "gallery": "node --experimental-strip-types scripts/dev-gallery.ts",
+    "catalog": "node --experimental-strip-types scripts/catalog-json.ts > ../../app/test/fixtures/catalog.json"
   },
   "dependencies": {
     "@pb/schema": "workspace:*"

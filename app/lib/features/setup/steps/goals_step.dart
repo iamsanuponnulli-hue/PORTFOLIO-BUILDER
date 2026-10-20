@@ -139,7 +139,7 @@ class GoalsStep extends StatelessWidget {
           child: FilledButton(
             key: const Key('next'),
             onPressed: onNext,
-            child: const Text('Next: review'),
+            child: const Text('Next: sites you like'),
           ),
         ),
       ],

@@ -57,12 +57,16 @@ class AiModel {
     required this.free,
     required this.images,
     required this.smart,
+    this.recommended = false,
   });
   final String id;
   final String label;
   final bool free;
   final bool images;
   final bool smart;
+
+  /// Known to work well for this app's tasks (from the model registry).
+  final bool recommended;
 
   factory AiModel.fromJson(Map<String, dynamic> j) {
     final caps = jsonMap(j['capabilities']);
@@ -72,6 +76,7 @@ class AiModel {
       free: j['free'] as bool? ?? false,
       images: caps['images'] as bool? ?? false,
       smart: caps['smart'] as bool? ?? true,
+      recommended: j['status'] == 'recommended',
     );
   }
 }
@@ -95,6 +100,42 @@ class AiChoice {
   const AiChoice(this.provider, this.model);
   final String provider;
   final String model;
+
+  @override
+  bool operator ==(Object other) =>
+      other is AiChoice && other.provider == provider && other.model == model;
+  @override
+  int get hashCode => Object.hash(provider, model);
+}
+
+/// Smart: design generation and the assistant. Fast: parsing, rewrites, alt text.
+enum AiTier { smart, fast }
+
+/// AI requests and tokens for one month, provider and model (counted on this device).
+class UsageRow {
+  const UsageRow(
+    this.month,
+    this.provider,
+    this.model,
+    this.requests,
+    this.inputTokens,
+    this.outputTokens,
+  );
+  final String month;
+  final String provider;
+  final String model;
+  final int requests;
+  final int inputTokens;
+  final int outputTokens;
+
+  factory UsageRow.fromJson(Map<String, dynamic> j) => UsageRow(
+    j['month'] as String,
+    j['provider'] as String,
+    j['model'] as String,
+    (j['requests'] as num).toInt(),
+    (j['inputTokens'] as num? ?? 0).toInt(),
+    (j['outputTokens'] as num? ?? 0).toInt(),
+  );
 }
 
 /// AI setup: keys live on this device (via the bridge), the model choice syncs
@@ -145,12 +186,26 @@ class AiRepository {
     (await _pb.invoke('openRouter', 'finish', [code])).get<Object?>(),
   );
 
+  /// One model for everything (simple mode).
   Future<void> saveChoice(String uid, AiChoice choice) =>
-      _db.doc('users/$uid').update({
-        'ai': {
-          'simple': true,
-          'smart': {'provider': choice.provider, 'model': choice.model},
-          'fast': {'provider': choice.provider, 'model': choice.model},
-        },
-      });
+      saveChoices(uid, smart: choice, fast: choice, simple: true);
+
+  /// Separate Smart and Fast models (advanced mode), possibly different providers.
+  Future<void> saveChoices(
+    String uid, {
+    required AiChoice smart,
+    required AiChoice fast,
+    required bool simple,
+  }) => _db.doc('users/$uid').update({
+    'ai': {
+      'simple': simple,
+      'smart': {'provider': smart.provider, 'model': smart.model},
+      'fast': {'provider': fast.provider, 'model': fast.model},
+    },
+  });
+
+  Future<List<UsageRow>> usage() async =>
+      jsonList((await _pb.invoke('usage', 'list')).get<Object?>())
+          .map(UsageRow.fromJson)
+          .toList();
 }

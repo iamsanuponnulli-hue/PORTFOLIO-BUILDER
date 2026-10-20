@@ -8,14 +8,25 @@ import '../../../core/js/pb_bridge.dart';
 import '../../../core/ui/feedback.dart';
 import '../../../models/generated/models.dart';
 import '../../project/project_session.dart';
+import '../content_ai.dart';
 import '../content_editors.dart';
 import '../widgets.dart';
 
 /// Step 2: check and complete everything the site will say.
 class ContentStep extends ConsumerStatefulWidget {
-  const ContentStep({super.key, required this.session, required this.onNext});
+  const ContentStep({
+    super.key,
+    required this.session,
+    this.onNext,
+    this.embedded = false,
+  });
   final ProjectSession session;
-  final VoidCallback onNext;
+
+  /// The wizard's "Next" button (left out in the editor).
+  final VoidCallback? onNext;
+
+  /// Shown in the editor's Content panel: no page heading.
+  final bool embedded;
 
   @override
   ConsumerState<ContentStep> createState() => _ContentStepState();
@@ -58,6 +69,27 @@ class _ContentStepState extends ConsumerState<ContentStep> {
       if (mounted) showMessage(context, e.message);
     } finally {
       if (mounted) setState(() => _pickingPhoto = false);
+    }
+  }
+
+  /// Adds a screenshot or photo to a project (kept on this computer).
+  Future<void> _addProjectImage(int index) async {
+    final project = _content.projects[index];
+    final fileId = 'img-${project.id}-${DateTime.now().millisecondsSinceEpoch}';
+    try {
+      final r = await ref.read(pbBridgeProvider).invoke('files', 'pickImage', [
+        widget.session.projectId,
+        fileId,
+      ]);
+      if (r.get<Object?>() == null) return;
+      _edit(
+        (j) => (((j['projects'] as List)[index] as Map)['images'] as List).add({
+          'assetId': fileId,
+          'alt': project.title,
+        }),
+      );
+    } on PbException catch (e) {
+      if (mounted) showMessage(context, e.message);
     }
   }
 
@@ -105,17 +137,35 @@ class _ContentStepState extends ConsumerState<ContentStep> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Text(
-          'Check and complete your content',
-          style: theme.textTheme.headlineSmall,
-        ),
-        const SizedBox(height: 4),
-        const Text(
-          'This is what your site will say. The design comes next, and you can change everything later.',
-        ),
-        const SizedBox(height: 20),
+        if (!widget.embedded) ...[
+          Text(
+            'Check and complete your content',
+            style: theme.textTheme.headlineSmall,
+          ),
+          const SizedBox(height: 4),
+          const Text(
+            'This is what your site will say. The design comes next, and you can change everything later.',
+          ),
+          const SizedBox(height: 20),
+        ],
         SectionCard(
           title: 'About you',
+          trailing: TextButton.icon(
+            key: const Key('polish-profile'),
+            onPressed: () => polishText(
+              context,
+              ref,
+              widget.session,
+              what: 'The headline, tagline and about text of a portfolio',
+              items: [
+                TextItem(['profile', 'headline'], 'Headline', p.headline),
+                TextItem(['profile', 'tagline'], 'Tagline', p.tagline),
+                TextItem(['profile', 'bio'], 'About', p.bio),
+              ],
+            ),
+            icon: const Icon(Icons.auto_awesome_outlined, size: 18),
+            label: const Text('Polish wording'),
+          ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: [
@@ -160,10 +210,23 @@ class _ContentStepState extends ConsumerState<ContentStep> {
                 onChanged: (v) => _setProfile('headline', v),
               ),
               const SizedBox(height: 12),
-              SyncedField(
-                label: 'Tagline (optional)',
-                value: p.tagline,
-                onChanged: (v) => _setProfile('tagline', v),
+              Row(
+                children: [
+                  Expanded(
+                    child: SyncedField(
+                      label: 'Tagline (optional)',
+                      value: p.tagline,
+                      onChanged: (v) => _setProfile('tagline', v),
+                    ),
+                  ),
+                  IconButton(
+                    key: const Key('suggest-tagline'),
+                    tooltip: 'Suggest taglines',
+                    onPressed: () =>
+                        suggestTagline(context, ref, widget.session),
+                    icon: const Icon(Icons.auto_awesome_outlined),
+                  ),
+                ],
               ),
               const SizedBox(height: 12),
               SyncedField(
@@ -301,6 +364,79 @@ class _ContentStepState extends ConsumerState<ContentStep> {
                         trailing: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
+                            if (s.key == 'experience')
+                              IconButton(
+                                key: Key('polish-${s.key}-$i'),
+                                tooltip: 'Improve the bullet points',
+                                icon: const Icon(Icons.auto_awesome_outlined),
+                                onPressed: () => polishText(
+                                  context,
+                                  ref,
+                                  widget.session,
+                                  what:
+                                      'Bullet points for ${s.titleOf(m)} (action verb + outcome)',
+                                  items: [
+                                    for (final (b, text)
+                                        in ((m['bullets'] as List?) ?? const [])
+                                            .cast<String>()
+                                            .indexed)
+                                      TextItem(
+                                        ['experience', i, 'bullets', b],
+                                        'Bullet ${b + 1}',
+                                        text,
+                                      ),
+                                  ],
+                                ),
+                              ),
+                            if (s.key == 'projects')
+                              PopupMenuButton<String>(
+                                key: Key('project-ai-$i'),
+                                tooltip: 'Write with AI',
+                                icon: const Icon(Icons.auto_awesome_outlined),
+                                onSelected: (a) => a == 'image'
+                                    ? _addProjectImage(i)
+                                    : a == 'case'
+                                    ? caseStudyInterview(
+                                        context,
+                                        ref,
+                                        widget.session,
+                                        i,
+                                      )
+                                    : polishText(
+                                        context,
+                                        ref,
+                                        widget.session,
+                                        what:
+                                            'A short summary of the project "${s.titleOf(m)}"',
+                                        items: [
+                                          TextItem(
+                                            ['projects', i, 'summary'],
+                                            'Summary',
+                                            (m['summary'] as String?) ?? '',
+                                          ),
+                                        ],
+                                      ),
+                                itemBuilder: (_) => [
+                                  PopupMenuItem(
+                                    value: 'image',
+                                    child: Text(
+                                      'Add an image (${((m['images'] as List?) ?? const []).length} so far)',
+                                    ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'summary',
+                                    child: Text('Improve the summary'),
+                                  ),
+                                  PopupMenuItem(
+                                    value: 'case',
+                                    child: Text(
+                                      m['caseStudy'] == null
+                                          ? 'Write a case study'
+                                          : 'Edit the case study',
+                                    ),
+                                  ),
+                                ],
+                              ),
                             IconButton(
                               tooltip: 'Move up',
                               icon: const Icon(Icons.arrow_upward),
@@ -332,15 +468,17 @@ class _ContentStepState extends ConsumerState<ContentStep> {
             ),
           ),
         ],
-        const SizedBox(height: 24),
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton(
-            key: const Key('next'),
-            onPressed: widget.onNext,
-            child: const Text('Next: your goals'),
+        if (widget.onNext != null) ...[
+          const SizedBox(height: 24),
+          Align(
+            alignment: Alignment.centerRight,
+            child: FilledButton(
+              key: const Key('next'),
+              onPressed: widget.onNext,
+              child: const Text('Next: your goals'),
+            ),
           ),
-        ),
+        ],
       ],
     );
   }

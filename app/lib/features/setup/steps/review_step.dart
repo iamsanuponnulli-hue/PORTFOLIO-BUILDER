@@ -44,7 +44,7 @@ List<ReviewItem> reviewItems(ProjectDoc doc) {
   ];
 }
 
-/// Step 4: check what's there, then create the first version of the site.
+/// Last step: check what's there, then see designs (or use a ready-made one).
 class ReviewStep extends ConsumerStatefulWidget {
   const ReviewStep({super.key, required this.session, required this.onEdit});
   final ProjectSession session;
@@ -57,6 +57,12 @@ class ReviewStep extends ConsumerStatefulWidget {
 class _ReviewStepState extends ConsumerState<ReviewStep> {
   bool _creating = false;
 
+  Future<void> _seeDesigns() async {
+    await widget.session.flush();
+    if (mounted) context.go('/p/${widget.session.projectId}/designs');
+  }
+
+  /// Skips the design choice: the profile type's layout with the tone's theme.
   Future<void> _create() async {
     final doc = widget.session.doc!;
     setState(() => _creating = true);
@@ -128,14 +134,25 @@ class _ReviewStepState extends ConsumerState<ReviewStep> {
           ),
         ),
         const SizedBox(height: 24),
-        Align(
-          alignment: Alignment.centerRight,
-          child: FilledButton.icon(
-            key: const Key('create-site'),
-            onPressed: !ready || _creating ? null : _create,
-            icon: const Icon(Icons.auto_awesome),
-            label: Text(_creating ? 'Creating…' : 'Create my site'),
-          ),
+        Wrap(
+          alignment: WrapAlignment.end,
+          spacing: 12,
+          runSpacing: 12,
+          children: [
+            OutlinedButton(
+              key: const Key('create-site'),
+              onPressed: !ready || _creating ? null : _create,
+              child: Text(
+                _creating ? 'Creating…' : 'Skip: use a ready-made design',
+              ),
+            ),
+            FilledButton.icon(
+              key: const Key('see-designs'),
+              onPressed: !ready || _creating ? null : _seeDesigns,
+              icon: const Icon(Icons.auto_awesome),
+              label: const Text('See 3 designs'),
+            ),
+          ],
         ),
       ],
     );

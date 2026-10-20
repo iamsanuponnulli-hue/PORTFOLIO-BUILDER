@@ -141,8 +141,31 @@ export function apply(state: SiteState, op: Operation): SiteState {
       return { ...withSections(state, sections), custom };
     }
 
+    case 'addCustomSection': {
+      const sections = state.spec.sections.slice();
+      const id = newSectionId(state, 'custom');
+      sections.splice(clampIndex(op.index, sections.length), 0, {
+        id,
+        type: 'custom',
+        variant: 'custom',
+        visible: true,
+        options: op.title ? { title: op.title } : {},
+        custom: true,
+      });
+      const custom = {
+        ...state.custom,
+        sections: {
+          ...state.custom.sections,
+          [id]: { html: op.html, css: op.css ?? '', js: op.js ?? '' },
+        },
+      };
+      return { ...withSections(state, sections), custom };
+    }
+
     case 'revertToManaged': {
       const i = findSection(state, op.id);
+      if (state.spec.sections[i]!.type === 'custom')
+        fail('A custom section has no generated layout to go back to. Remove it instead.');
       const sections = state.spec.sections.slice();
       sections[i] = { ...sections[i]!, custom: false };
       const custom = { ...state.custom, sections: { ...state.custom.sections } };
