@@ -40,6 +40,18 @@ async function result(fn: () => Promise<unknown>): Promise<string> {
   }
 }
 
+/** Widest image variant used in previews (exports get every size). */
+const PREVIEW_IMAGE_WIDTH = 960;
+
+function dataUrl(blob: Blob): Promise<string> {
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = () => reject(r.error ?? new Error("Couldn't read an image."));
+    r.readAsDataURL(blob);
+  });
+}
+
 /** Opens the browser's file picker. Resolves to [] when the user cancels. */
 function pickFiles(accept: string, multiple = false): Promise<File[]> {
   return new Promise((resolve) => {
@@ -102,7 +114,7 @@ function createBridge(scriptSrc: string) {
     // The worker is an ES module next to this script, started on first use.
     call ??= client(
       new Worker(new URL('worker/worker.js', scriptSrc), { type: 'module' }) as unknown as Port,
-      180_000,
+      240_000, // an AI task can make two calls of up to 100 s each
     );
     return call<T>(method, ...args);
   };
@@ -111,7 +123,6 @@ function createBridge(scriptSrc: string) {
   let user = 'signed-out';
   let store: Promise<LocalStore> | undefined;
   const local = () => (store ??= openLocalStore(`portfolio-builder-${user}`));
-  const blobUrls = new Map<string, string[]>();
   const backups = new Map<string, { files: unknown[] }>();
   let axeSource: Promise<string> | undefined;
   let editor: Promise<typeof import('./editor.ts')> | undefined;
@@ -282,6 +293,9 @@ function createBridge(scriptSrc: string) {
         }),
       models: (provider: string) =>
         result(async () => workerCall('listModels', await keys(provider))),
+      /** Sends the model one tiny request; resolves to {ms} or an AI error. */
+      test: (provider: string, model: string) =>
+        result(async () => workerCall('testModel', await keys(provider), model)),
       remove: (provider: string) => result(async () => (await local()).keys.remove(provider)),
     },
 
@@ -525,33 +539,27 @@ function createBridge(scriptSrc: string) {
           return { fileId, width: img.width, height: img.height };
         }),
       /** Image URLs for the preview (blob: URLs, valid until the next call). */
+      /**
+       * Images for previews, as data URLs: the preview is a sandboxed page with
+       * its own origin, which can't load this page's blob: URLs. A mid-size
+       * variant keeps each re-render small.
+       */
       previewAssets: (projectId: string) =>
         result(async () => {
-          for (const u of blobUrls.get(projectId) ?? []) URL.revokeObjectURL(u);
-          const urls: string[] = [];
-          const assets: Record<
-            string,
-            { src: string; width?: number; height?: number; srcset?: string }
-          > = {};
+          const assets: Record<string, { src: string; width?: number; height?: number }> = {};
           const list = (await files(projectId)).filter(
             (f: FileRecord) => f.kind === 'image' || f.kind === 'inspiration',
           );
-          for (const f of list) {
-            const src = URL.createObjectURL(f.blob);
-            urls.push(src);
-            const variants = Object.entries(f.variants ?? {}).map(([w, b]) => {
-              const u = URL.createObjectURL(b);
-              urls.push(u);
-              return `${u} ${w}w`;
-            });
-            assets[f.fileId] = {
-              src,
-              width: f.width,
-              height: f.height,
-              ...(variants.length > 1 ? { srcset: variants.join(', ') } : {}),
-            };
-          }
-          blobUrls.set(projectId, urls);
+          await Promise.all(
+            list.map(async (f: FileRecord) => {
+              const widths = Object.keys(f.variants ?? {})
+                .map(Number)
+                .sort((a, b) => a - b);
+              const w = [...widths].reverse().find((x) => x <= PREVIEW_IMAGE_WIDTH) ?? widths[0];
+              const blob = w === undefined ? f.blob : f.variants![w]!;
+              assets[f.fileId] = { src: await dataUrl(blob), width: f.width, height: f.height };
+            }),
+          );
           return assets;
         }),
       /** Whether a PDF resume is kept for this project (offered in the export). */

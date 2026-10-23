@@ -19,8 +19,12 @@ class ContentStep extends ConsumerStatefulWidget {
     required this.session,
     this.onNext,
     this.embedded = false,
+    this.onImageAdded,
   });
   final ProjectSession session;
+
+  /// Called after an image is stored (the editor reloads its preview images).
+  final VoidCallback? onImageAdded;
 
   /// The wizard's "Next" button (left out in the editor).
   final VoidCallback? onNext;
@@ -58,6 +62,7 @@ class _ContentStepState extends ConsumerState<ContentStep> {
         'photo',
       ]);
       if (r.get<Object?>() == null) return;
+      widget.onImageAdded?.call();
       final name = _content.profile.name.trim();
       _edit(
         (j) => (j['profile'] as Map)['photo'] = {
@@ -82,6 +87,7 @@ class _ContentStepState extends ConsumerState<ContentStep> {
         fileId,
       ]);
       if (r.get<Object?>() == null) return;
+      widget.onImageAdded?.call();
       _edit(
         (j) => (((j['projects'] as List)[index] as Map)['images'] as List).add({
           'assetId': fileId,

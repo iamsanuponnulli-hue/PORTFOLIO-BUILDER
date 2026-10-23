@@ -24,29 +24,15 @@ void main() {
     child: MaterialApp(home: child),
   );
 
-  testWidgets('sign-in page offers Google, GitHub and email', (tester) async {
+  testWidgets('sign-in page offers Google only', (tester) async {
     await tester.pumpWidget(
       wrap(const SignInPage(), [
         firebaseAuthProvider.overrideWithValue(MockFirebaseAuth()),
       ]),
     );
     expect(find.text('Continue with Google'), findsOneWidget);
-    expect(find.text('Continue with GitHub'), findsOneWidget);
-    expect(find.byKey(const Key('email')), findsOneWidget);
-  });
-
-  testWidgets('sign-in validates email and password before submitting', (
-    tester,
-  ) async {
-    await tester.pumpWidget(
-      wrap(const SignInPage(), [
-        firebaseAuthProvider.overrideWithValue(MockFirebaseAuth()),
-      ]),
-    );
-    await tester.tap(find.byKey(const Key('submit')));
-    await tester.pump();
-    expect(find.text('Enter a valid email address.'), findsOneWidget);
-    expect(find.text('Use at least 8 characters.'), findsOneWidget);
+    expect(find.text('Continue with GitHub'), findsNothing);
+    expect(find.byKey(const Key('email')), findsNothing);
   });
 
   testWidgets('dashboard creates a portfolio and shows the count', (

@@ -13,6 +13,7 @@ import {
   rewriteItems,
   suggestTaglines,
   suggestModel,
+  testModel,
   writeCaseStudy,
   type CaseStudyInput,
   type Credentials,
@@ -253,6 +254,7 @@ export const workerHandlers = {
     const models = await listModels(c);
     return { models, suggested: suggestModel(c.provider, models)?.id };
   },
+  testModel: (c: Credentials, modelId: string) => testModel(c, modelId),
   parseResume: async (c: Credentials, modelId: string, text: string) => {
     const m = await model(c, modelId);
     const r = await parseResume(m.model, m.label, { text });

@@ -21,6 +21,9 @@ export interface TaskResult<T> {
   repaired: boolean;
 }
 
+/** Longest wait for one model reply. A task makes at most two calls. */
+export const CALL_TIMEOUT_MS = 100_000;
+
 const JSON_RULES =
   'Reply with one JSON value only: no explanation, no markdown fences. Use double quotes and no trailing commas.';
 
@@ -40,7 +43,9 @@ export async function runJsonTask<T>(task: JsonTask<T>): Promise<TaskResult<T>> 
   const messages: ModelMessage[] = [{ role: 'user', content: task.content } as ModelMessage];
   const usage = { inputTokens: 0, outputTokens: 0 };
 
+  let cutOff = false;
   const call = async () => {
+    const timeout = AbortSignal.timeout(CALL_TIMEOUT_MS);
     try {
       const r = await generateText({
         model: task.model,
@@ -48,13 +53,14 @@ export async function runJsonTask<T>(task: JsonTask<T>): Promise<TaskResult<T>> 
         messages,
         maxOutputTokens: task.maxOutputTokens ?? 8000,
         maxRetries: 1,
-        abortSignal: task.signal,
+        abortSignal: task.signal ? AbortSignal.any([task.signal, timeout]) : timeout,
       });
       usage.inputTokens += r.usage.inputTokens ?? 0;
       usage.outputTokens += r.usage.outputTokens ?? 0;
       if (r.finishReason === 'content-filter') {
         throw new AiError('refused', 'The model declined this request. Try another model.');
       }
+      cutOff = r.finishReason === 'length';
       return r.text;
     } catch (e) {
       throw toAiError(e, task.providerLabel);
@@ -80,6 +86,12 @@ export async function runJsonTask<T>(task: JsonTask<T>): Promise<TaskResult<T>> 
   const first = await call();
   const a = check(first);
   if (a.ok) return { value: a.value, usage, repaired: false };
+  // A reply that hit the length limit would be cut off again: asking for a fix wastes a call.
+  if (cutOff)
+    throw new AiError(
+      'invalid_output',
+      "The model's answer was cut off before it finished. Try again, or pick a more capable model.",
+    );
 
   messages.push({ role: 'assistant', content: first });
   messages.push({ role: 'user', content: `${a.feedback}\nSend the corrected JSON only.` });

@@ -209,10 +209,29 @@ const img: R = JSON.parse(await imgPick);
 check('image is processed and stored', img.ok && img.value.width === 2, img);
 const assets = await pb(`pb.files.previewAssets('p1')`);
 check(
-  'preview gets a blob URL for the image',
-  assets.ok && String(assets.value.photo?.src).startsWith('blob:'),
+  'preview gets the image as a data URL',
+  assets.ok && String(assets.value.photo?.src).startsWith('data:image/'),
   assets,
 );
+// The real preview is a sandboxed page with its own origin: the image must load there.
+const shown = await page.evaluate(
+  (src) =>
+    new Promise<boolean>((resolve) => {
+      const f = document.createElement('iframe');
+      f.setAttribute('sandbox', 'allow-scripts');
+      const onMessage = (e: MessageEvent) => {
+        if (e.source !== f.contentWindow) return;
+        removeEventListener('message', onMessage);
+        f.remove();
+        resolve(e.data === 'loaded');
+      };
+      addEventListener('message', onMessage);
+      f.srcdoc = `<img src="${src}" onload="parent.postMessage('loaded','*')" onerror="parent.postMessage('failed','*')">`;
+      document.body.append(f);
+    }),
+  String(assets.value?.photo?.src),
+);
+check('the image shows inside the sandboxed preview', shown);
 
 // Rendering in the worker still works alongside everything else.
 const spec = JSON.parse((await page.evaluate(`pb.worker.defaultSpec('developer')`)) as string);
@@ -400,7 +419,7 @@ const restored = await pb(`pb.backup.restoreFiles('${opened.value?.token}', 'p2'
 const p2 = await pb(`pb.files.previewAssets('p2')`);
 check(
   'backup images are restored for another project',
-  restored.ok && String(p2.value?.photo?.src).startsWith('blob:'),
+  restored.ok && String(p2.value?.photo?.src).startsWith('data:image/'),
   { restored, p2 },
 );
 

@@ -51,6 +51,12 @@ const EXT: Record<string, string> = {
 const safeId = (id: string) => id.replace(/[^a-z0-9_-]+/gi, '-').slice(0, 60) || 'image';
 
 /** Every file of the downloadable site, with relative paths so it works anywhere. */
+function sameBytes(a: Uint8Array, b: Uint8Array): boolean {
+  if (a.length !== b.length) return false;
+  for (let i = 0; i < a.length; i++) if (a[i] !== b[i]) return false;
+  return true;
+}
+
 export function buildSite(input: ExportInput): ExportResult {
   const notes: string[] = [];
   const files: Record<string, Uint8Array> = {};
@@ -96,7 +102,21 @@ export function buildSite(input: ExportInput): ExportResult {
     if (!text && /(custom\.(css|js)|main\.js)$/.test(path)) continue;
     files[path] = strToU8(text);
   }
-  if (haveFonts) for (const s of slugs) files[`assets/fonts/${s}.woff2`] = input.fonts![s]!;
+  if (haveFonts) {
+    // Variable fonts come as one file for every weight: include it once.
+    const kept: { slug: string; data: Uint8Array }[] = [];
+    let css = out.files['assets/css/theme.css'] ?? '';
+    for (const s of slugs) {
+      const data = input.fonts![s]!;
+      const same = kept.find((k) => sameBytes(k.data, data));
+      if (same) css = css.split(`/${s}.woff2"`).join(`/${same.slug}.woff2"`);
+      else {
+        kept.push({ slug: s, data });
+        files[`assets/fonts/${s}.woff2`] = data;
+      }
+    }
+    if (css) files['assets/css/theme.css'] = strToU8(css);
+  }
   if (input.favicon) files['favicon.ico'] = input.favicon;
   if (input.ogImage) files['og-image.png'] = input.ogImage;
   if (input.resume) files['resume.pdf'] = input.resume.data;

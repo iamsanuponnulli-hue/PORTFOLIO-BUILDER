@@ -41,7 +41,11 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
       final list = await repo.finishOpenRouter(code);
       ref.invalidate(savedKeysProvider);
       if (!mounted) return;
-      final model = await showModelPicker(context, list);
+      final model = await showModelPicker(
+        context,
+        list,
+        test: (m) => repo.testModel('openrouter', m),
+      );
       if (model != null) {
         await repo.saveChoice(
           ref.read(authUserProvider).value!.uid,
@@ -66,7 +70,11 @@ class _AiSettingsPageState extends ConsumerState<AiSettingsPage> {
       final repo = ref.read(aiRepositoryProvider);
       final list = await repo.models(provider);
       if (!mounted) return;
-      final model = await showModelPicker(context, list);
+      final model = await showModelPicker(
+        context,
+        list,
+        test: (m) => repo.testModel(provider, m),
+      );
       if (model == null) return;
       final uid = ref.read(authUserProvider).value!.uid;
       final ai = ref.read(userDocProvider).value?.ai;
@@ -295,22 +303,39 @@ class _ModelsCard extends ConsumerWidget {
     final smart = ai?.smart;
     final fast = ai?.fast ?? smart;
     final advanced = ai != null && !ai.simple;
-    Widget row(String title, String help, ModelChoice? c, AiTier? tier) =>
-        ListTile(
-          leading: const Icon(Icons.auto_awesome_outlined),
-          title: Text(
-            c == null ? 'No model chosen yet' : '$title: ${label(c.provider)}',
-          ),
-          subtitle: Text(
-            c == null ? 'Add a key to choose a model.' : '${c.model}\n$help',
-          ),
-          isThreeLine: c != null,
-          trailing: TextButton(
-            key: Key('change-model-${tier?.name ?? 'all'}'),
-            onPressed: () => onChange(tier),
-            child: Text(c == null ? 'Choose' : 'Change'),
-          ),
-        );
+    final keys = ref.watch(savedKeysProvider).value;
+    // The choice syncs between computers; keys don't.
+    bool missingKey(ModelChoice c) =>
+        keys != null && !keys.any((k) => k.provider == c.provider);
+    Widget row(
+      String title,
+      String help,
+      ModelChoice? c,
+      AiTier? tier,
+    ) => ListTile(
+      leading: Icon(
+        c != null && missingKey(c)
+            ? Icons.warning_amber_outlined
+            : Icons.auto_awesome_outlined,
+      ),
+      title: Text(
+        c == null ? 'No model chosen yet' : '$title: ${label(c.provider)}',
+      ),
+      subtitle: Text(
+        c == null
+            ? 'Add a key to choose a model.'
+            : missingKey(c)
+            ? '${c.model}\nThe ${label(c.provider)} key isn\'t on this computer. '
+                  'Add it below to use AI here.'
+            : '${c.model}\n$help',
+      ),
+      isThreeLine: c != null,
+      trailing: TextButton(
+        key: Key('change-model-${tier?.name ?? 'all'}'),
+        onPressed: () => onChange(tier),
+        child: Text(c == null ? 'Choose' : 'Change'),
+      ),
+    );
     return Card(
       child: Column(
         children: [

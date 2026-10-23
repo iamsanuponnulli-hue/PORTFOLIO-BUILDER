@@ -45,6 +45,7 @@ class _EditorPageState extends ConsumerState<EditorPage>
     pb: pb,
   );
   late final ScoreTracker score = ScoreTracker(editor);
+  final _keys = FocusNode(debugLabel: 'editor shortcuts');
   late final Catalog catalog = Catalog.parse(pb.catalogJson());
   late final TabController tabs = TabController(
     length: _panels.length,
@@ -69,6 +70,7 @@ class _EditorPageState extends ConsumerState<EditorPage>
 
   @override
   void dispose() {
+    _keys.dispose();
     session.removeListener(_changed);
     score.dispose();
     editor.dispose();
@@ -113,12 +115,9 @@ class _EditorPageState extends ConsumerState<EditorPage>
   int _missingImages() {
     final d = session.doc;
     if (d == null || !_assetsLoaded) return 0;
-    final ids = {
-      if (d.content.profile.photo != null) d.content.profile.photo!.assetId,
-      for (final p in d.content.projects)
-        for (final im in p.images) im.assetId,
-    };
-    return ids.where((id) => !editor.assets.containsKey(id)).length;
+    return EditorController.imageIds(d)
+        .where((id) => !editor.assets.containsKey(id))
+        .length;
   }
 
   Future<void> _restoreImagesFromBackup() async {
@@ -151,10 +150,20 @@ class _EditorPageState extends ConsumerState<EditorPage>
             editor.redo,
       },
       child: Focus(
+        focusNode: _keys,
         autofocus: true,
-        child: ListenableBuilder(
-          listenable: Listenable.merge([session, editor]),
-          builder: (context, _) => _scaffold(context),
+        // After a click in the preview the browser's focus stays there; a click
+        // anywhere else in the editor brings the shortcuts back.
+        child: Listener(
+          onPointerDown: (_) {
+            final typing = FocusManager.instance.primaryFocus?.context
+                ?.findAncestorWidgetOfExactType<EditableText>();
+            if (typing == null) _keys.requestFocus();
+          },
+          child: ListenableBuilder(
+            listenable: Listenable.merge([session, editor]),
+            builder: (context, _) => _scaffold(context),
+          ),
         ),
       ),
     );
@@ -451,7 +460,11 @@ class _EditorPageState extends ConsumerState<EditorPage>
               ThemePanel(editor: editor, catalog: catalog),
               SingleChildScrollView(
                 padding: const EdgeInsets.all(12),
-                child: ContentStep(session: session, embedded: true),
+                child: ContentStep(
+                  session: session,
+                  embedded: true,
+                  onImageAdded: editor.refreshAssets,
+                ),
               ),
               SitePanel(editor: editor),
             ],
@@ -582,6 +595,7 @@ class _EditorPageState extends ConsumerState<EditorPage>
                         html: editor.html!,
                         controller: editor.frame,
                         onMessage: editor.onPreviewMessage,
+                        scrollKey: editor.page,
                       ),
                     ),
                   ),

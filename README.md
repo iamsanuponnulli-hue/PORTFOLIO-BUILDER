@@ -115,7 +115,7 @@ CI runs all of these on every pull request (`.github/workflows/ci.yml`).
 ## Using a real Firebase project (free, no card)
 
 1. Create a Firebase project on the free **Spark** plan (don't upgrade to Blaze). Enable
-   Authentication (Email/Password, Google, GitHub) and Firestore, and register a web app
+   Authentication (Google sign-in) and Firestore, and register a web app
    to get its config values.
 2. Deploy the rules and indexes:
    ```bash

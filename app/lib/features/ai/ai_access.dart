@@ -35,6 +35,8 @@ const _modelProblems = {
   'invalid_output',
   'refused',
   'no_vision',
+  'too_long',
+  'timeout',
 };
 
 /// Shows an AI error with a one-click way to pick another model when that helps.

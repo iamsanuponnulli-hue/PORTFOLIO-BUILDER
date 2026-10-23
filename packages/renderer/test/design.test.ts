@@ -265,3 +265,20 @@ describe('briefFromStyles', () => {
     });
   });
 });
+
+describe('direction names', () => {
+  it('names gallery styles as styles, not as sites', () => {
+    const gallery = (title: string) =>
+      Inspiration.parse({
+        id: title,
+        source: 'gallery',
+        title,
+        brief: { palette: ['#111111', '#ff3366'], mood: ['bold'] },
+        borrow: { colors: true, fonts: true, layout: true, mood: true },
+      });
+    const [same] = curatedDirections('developer', { tone: 'bold' }, [gallery('Bold')]);
+    expect(same!.name).toBe('Bold');
+    const [other] = curatedDirections('developer', { tone: 'bold' }, [gallery('Minimal')]);
+    expect(other!.name).toBe('Bold · Minimal style');
+  });
+});

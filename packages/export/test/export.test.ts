@@ -82,6 +82,21 @@ describe('site export', () => {
     expect(Object.keys(ok.files).some((p) => p.startsWith('assets/fonts/'))).toBe(true);
   });
 
+  it('includes a variable font once for all its weights', () => {
+    const t = state.spec.theme.fonts;
+    const families = [...new Set([t.heading, t.body, t.mono])];
+    const fonts: Record<string, Uint8Array> = {};
+    families.forEach((f, i) => {
+      for (const w of [400, 500, 600, 700, 800]) fonts[fontFileSlug(f, w)] = bytes(4, i + 1);
+    });
+    const out = buildSite({ state, images: [], fonts });
+    const files = Object.keys(out.files).filter((p) => p.startsWith('assets/fonts/'));
+    expect(files).toHaveLength(families.length);
+    const css = text(out.files['assets/css/theme.css']);
+    for (const m of css.matchAll(/url\("\.\.\/fonts\/([^"]+)"\)/g))
+      expect(out.files[`assets/fonts/${m[1]}`]).toBeDefined();
+  });
+
   it('zips the files and names the zip after the person', () => {
     const out = buildSite({ state, images: [] });
     const unzipped = unzipSync(zipFiles(out.files));

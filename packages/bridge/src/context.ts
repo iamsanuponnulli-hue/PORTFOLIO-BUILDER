@@ -1,11 +1,4 @@
-import {
-  FONTS,
-  LIBRARY_TYPES,
-  NAV_VARIANTS,
-  PRESETS,
-  SECTION_CATALOG,
-  type SiteState,
-} from '@pb/renderer';
+import type { SiteState } from '@pb/renderer';
 import type { PortfolioContent } from '@pb/schema';
 
 /**
@@ -16,18 +9,7 @@ import type { PortfolioContent } from '@pb/schema';
 const clip = (s: string, n = 300) => (s.length > n ? `${s.slice(0, n - 1)}…` : s);
 const q = (s: string) => JSON.stringify(clip(s));
 
-/** The section library, presets and fonts as text. */
-export function catalogText(): string {
-  const lines = ['Section types and their layouts (type: layout ids):'];
-  for (const t of LIBRARY_TYPES)
-    lines.push(
-      `- ${t} (${SECTION_CATALOG[t].label}): ${SECTION_CATALOG[t].variants.map((v) => `${v.id} = ${v.label}`).join('; ')}`,
-    );
-  lines.push(`Navigation layouts: ${NAV_VARIANTS.map((v) => v.id).join(', ')}`);
-  lines.push(`Theme presets: ${PRESETS.map((p) => p.id).join(', ')}`);
-  lines.push(`Fonts: ${FONTS.map((f) => `${f.family} (${f.category})`).join(', ')}`);
-  return lines.join('\n');
-}
+export { catalogText } from '@pb/renderer';
 
 /** Every editable text with its content path, for assistant edits. */
 export function contentOutline(c: PortfolioContent, limit = 12_000): string {

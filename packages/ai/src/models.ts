@@ -1,5 +1,7 @@
-import { AiError } from './errors.ts';
-import { providerInfo, type Credentials, type ProviderId } from './providers.ts';
+import { z } from 'zod';
+import { AiError, httpError } from './errors.ts';
+import { runJsonTask } from './gateway.ts';
+import { createModel, providerInfo, type Credentials, type ProviderId } from './providers.ts';
 
 export interface Capabilities {
   /** Accepts images (screenshots, scanned resumes). */
@@ -72,21 +74,26 @@ async function getJson(
   url: string,
   headers: Record<string, string>,
   fetchImpl: typeof fetch,
+  providerLabel: string,
 ): Promise<unknown> {
   let res: Response;
   try {
-    res = await fetchImpl(url, { headers });
-  } catch {
+    res = await fetchImpl(url, { headers, signal: AbortSignal.timeout(20_000) });
+  } catch (e) {
+    if ((e as { name?: string }).name === 'TimeoutError')
+      throw new AiError('timeout', `${providerLabel} took too long to answer. Try again.`);
     throw new AiError(
       'network',
-      "Couldn't reach the provider. Check your connection (or the provider may not allow web pages to call it).",
+      `Couldn't reach ${providerLabel}. Check your connection, or the service may not allow web pages to call it.`,
     );
   }
-  if (res.status === 401 || res.status === 403)
-    throw new AiError('invalid_key', 'The provider rejected this key.');
-  if (!res.ok) throw new AiError('unknown', `The provider answered with an error (${res.status}).`);
+  if (!res.ok) throw httpError(res.status, providerLabel, await res.text().catch(() => ''));
   return res.json();
 }
+
+/** Model families that can't answer a text request (or are retired), hidden from the list. */
+const NOT_FOR_TEXT =
+  /embed|aqa|imagen|veo|tts|audio|live|image|vision-only|computer-use|robotics|learnlm|whisper|dall-e|moderation|guard|transcribe|realtime|search|^gemini-1\.|^gemini-pro$|^gemini-2\.0-.*(exp|thinking)/i;
 
 type Row = { id: string; label?: string; free?: boolean };
 
@@ -99,6 +106,7 @@ export async function listModels(
   fetchImpl: typeof fetch = fetch,
 ): Promise<ModelInfo[]> {
   const bearer = { Authorization: `Bearer ${c.apiKey}` };
+  const label = providerInfo(c.provider).label;
   let rows: Row[];
   switch (c.provider) {
     case 'gemini': {
@@ -106,30 +114,42 @@ export async function listModels(
         `${GEMINI}/models?pageSize=200`,
         { 'x-goog-api-key': c.apiKey },
         fetchImpl,
+        label,
       )) as {
         models?: { name: string; displayName?: string; supportedGenerationMethods?: string[] }[];
       };
       rows = (j.models ?? [])
+        .map((m) => ({ ...m, id: m.name.replace(/^models\//, '') }))
         .filter(
           (m) =>
-            m.supportedGenerationMethods?.includes('generateContent') &&
-            !/embedding|aqa|imagen|tts|image-generation/i.test(m.name),
+            m.supportedGenerationMethods?.includes('generateContent') && !NOT_FOR_TEXT.test(m.id),
         )
-        .map((m) => ({ id: m.name.replace(/^models\//, ''), label: m.displayName, free: true }));
+        .map((m) => ({ id: m.id, label: m.displayName, free: true }));
       break;
     }
     case 'openrouter': {
       // The key check is separate: the model list itself is public.
-      await getJson('https://openrouter.ai/api/v1/key', bearer, fetchImpl);
-      const j = (await getJson('https://openrouter.ai/api/v1/models', {}, fetchImpl)) as {
-        data?: { id: string; name?: string; pricing?: { prompt?: string; completion?: string } }[];
+      await getJson('https://openrouter.ai/api/v1/key', bearer, fetchImpl, label);
+      const j = (await getJson('https://openrouter.ai/api/v1/models', {}, fetchImpl, label)) as {
+        data?: {
+          id: string;
+          name?: string;
+          pricing?: { prompt?: string; completion?: string };
+          architecture?: { output_modalities?: string[] };
+        }[];
       };
-      rows = (j.data ?? []).map((m) => ({
-        id: m.id,
-        label: m.name,
-        free:
-          m.id.endsWith(':free') || (m.pricing?.prompt === '0' && m.pricing?.completion === '0'),
-      }));
+      rows = (j.data ?? [])
+        .filter(
+          (m) =>
+            !NOT_FOR_TEXT.test(m.id.split('/').at(-1)!) &&
+            (m.architecture?.output_modalities ?? ['text']).includes('text'),
+        )
+        .map((m) => ({
+          id: m.id,
+          label: m.name,
+          free:
+            m.id.endsWith(':free') || (m.pricing?.prompt === '0' && m.pricing?.completion === '0'),
+        }));
       break;
     }
     case 'anthropic': {
@@ -141,6 +161,7 @@ export async function listModels(
           'anthropic-dangerous-direct-browser-access': 'true',
         },
         fetchImpl,
+        label,
       )) as { data?: { id: string; display_name?: string }[] };
       rows = (j.data ?? []).map((m) => ({ id: m.id, label: m.display_name }));
       break;
@@ -154,14 +175,11 @@ export async function listModels(
             : c.provider === 'mistral'
               ? 'https://api.mistral.ai/v1'
               : (c.baseUrl ?? '').replace(/\/+$/, '');
-      const j = (await getJson(`${base}/models`, bearer, fetchImpl)) as { data?: { id: string }[] };
+      const j = (await getJson(`${base}/models`, bearer, fetchImpl, label)) as {
+        data?: { id: string }[];
+      };
       rows = (j.data ?? [])
-        .filter(
-          (m) =>
-            !/embed|whisper|tts|dall-e|moderation|guard|audio|transcribe|image|realtime/i.test(
-              m.id,
-            ),
-        )
+        .filter((m) => !NOT_FOR_TEXT.test(m.id))
         .map((m) => ({ id: m.id, free: c.provider === 'groq' }));
     }
   }
@@ -198,3 +216,21 @@ export function suggestModel(provider: ProviderId, models: ModelInfo[]): ModelIn
 }
 
 export { providerInfo };
+
+/**
+ * Sends one tiny JSON request, so a model that can't be used (not in the free tier,
+ * blocked by privacy settings, rejects a setting) fails here and not halfway
+ * through a task. Returns how long the answer took.
+ */
+export async function testModel(c: Credentials, modelId: string): Promise<{ ms: number }> {
+  const started = Date.now();
+  await runJsonTask({
+    model: await createModel(c, modelId),
+    providerLabel: providerInfo(c.provider).label,
+    system: 'You check that a connection works.',
+    content: 'Reply with {"ok":true}',
+    schema: z.object({ ok: z.boolean() }),
+    maxOutputTokens: 1024,
+  });
+  return { ms: Date.now() - started };
+}

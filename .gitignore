@@ -26,3 +26,6 @@ app/web/js/
 extension/dist/
 extension/*.zip
 evals/report.md
+app/prod.json
+firebase-debug.log
+firestore-debug.log

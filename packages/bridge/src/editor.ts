@@ -7,6 +7,7 @@ import { EditorView } from '@codemirror/view';
 import { basicSetup } from 'codemirror';
 
 const views = new Map<number, EditorView>();
+const observers = new Map<number, ResizeObserver>();
 let next = 1;
 
 const LANG = { html, css, javascript } as const;
@@ -60,6 +61,18 @@ export function mount(
   host.style.height = '100%';
   const id = next++;
   views.set(id, view);
+  // Flutter attaches the host to the page (inside its own shadow root) and sizes
+  // it only after CodeMirror has started, which left the code unstyled and
+  // unmeasured until the first scroll. Point CodeMirror at the real root and
+  // measure again whenever the host is resized.
+  const observer = new ResizeObserver(() => {
+    const root = host.getRootNode();
+    if ((root instanceof Document || root instanceof ShadowRoot) && root !== view.root)
+      view.setRoot(root);
+    view.requestMeasure();
+  });
+  observer.observe(host);
+  observers.set(id, observer);
   return id;
 }
 
@@ -80,6 +93,8 @@ export function goToLine(id: number, line: number): void {
 }
 
 export function destroy(id: number): void {
+  observers.get(id)?.disconnect();
+  observers.delete(id);
   views.get(id)?.destroy();
   views.delete(id);
 }

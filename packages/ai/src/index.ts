@@ -3,6 +3,7 @@ export * from './providers.ts';
 export {
   capabilitiesFor,
   listModels,
+  testModel,
   suggestModel,
   type Capabilities,
   type ModelInfo,

@@ -1,6 +1,9 @@
 {
   "projects": {
     "default": "demo-portfolio-builder",
-    "dev": "demo-portfolio-builder"
-  }
+    "dev": "demo-portfolio-builder",
+    "pfoliobuilder": "portfolio-builder-c4f97"
+  },
+  "targets": {},
+  "etags": {}
 }

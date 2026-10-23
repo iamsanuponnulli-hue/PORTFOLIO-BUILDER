@@ -345,7 +345,7 @@ export function curatedDirections(
     if (ref && k < used.length + 1) {
       theme = applyBrief(theme, ref.brief, ref.borrow);
       if (ref.borrow.layout) sections = applyLayoutHints(sections, ref.brief.layout);
-      name = `${preset.label}, like ${ref.title || 'your reference'}`.slice(0, 60);
+      name = refName(preset.label, ref);
     }
     if (goals.colorMode) theme = { ...theme, colorMode: goals.colorMode };
     out.push({
@@ -356,6 +356,15 @@ export function curatedDirections(
     });
   }
   return out;
+}
+
+/** A direction's name when a reference shaped it: "Bold, like example.dev". */
+function refName(label: string, ref: Inspiration): string {
+  const title = ref.title?.trim() || 'your reference';
+  // Gallery styles are styles, not sites: "Minimal", or "Bold · Minimal style".
+  if (ref.source === 'gallery')
+    return title.toLowerCase() === label.toLowerCase() ? label : `${label} · ${title} style`;
+  return `${label}, like ${title}`.slice(0, 60);
 }
 
 /** Readable text on a colour, for swatches in the editor. */

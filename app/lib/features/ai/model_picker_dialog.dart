@@ -1,17 +1,28 @@
 import 'package:flutter/material.dart';
 
+import '../../core/js/pb_bridge.dart';
 import 'ai_repository.dart';
 
-/// Lets the user pick a model, with free and capability labels. Returns its id.
-Future<String?> showModelPicker(BuildContext context, ModelList list) =>
-    showDialog<String>(
-      context: context,
-      builder: (_) => _ModelPicker(list: list),
-    );
+/// Sends a model one tiny request; throws [PbException] when it can't be used.
+typedef ModelTest = Future<void> Function(String modelId);
+
+/// Lets the user pick a model, with free and capability labels, and checks it
+/// with [test] before returning its id, so a model that can't be used (not in the
+/// free tier, blocked by privacy settings) fails here, not in the middle of a task.
+Future<String?> showModelPicker(
+  BuildContext context,
+  ModelList list, {
+  ModelTest? test,
+}) => showDialog<String>(
+  context: context,
+  barrierDismissible: false,
+  builder: (_) => _ModelPicker(list: list, test: test),
+);
 
 class _ModelPicker extends StatefulWidget {
-  const _ModelPicker({required this.list});
+  const _ModelPicker({required this.list, this.test});
   final ModelList list;
+  final ModelTest? test;
 
   @override
   State<_ModelPicker> createState() => _ModelPickerState();
@@ -24,6 +35,30 @@ class _ModelPickerState extends State<_ModelPicker> {
       widget.list.models.any((m) => m.free) &&
       widget.list.models.any((m) => !m.free);
   var _query = '';
+  var _testing = false;
+  String? _error;
+
+  Future<void> _use() async {
+    final id = _selected;
+    if (id == null) return;
+    final test = widget.test;
+    if (test == null) {
+      Navigator.pop(context, id);
+      return;
+    }
+    setState(() {
+      _testing = true;
+      _error = null;
+    });
+    try {
+      await test(id);
+      if (mounted) Navigator.pop(context, id);
+    } on PbException catch (e) {
+      if (mounted) setState(() => _error = e.message);
+    } finally {
+      if (mounted) setState(() => _testing = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -77,7 +112,12 @@ class _ModelPickerState extends State<_ModelPicker> {
                   ? const Center(child: Text('No models match.'))
                   : RadioGroup<String>(
                       groupValue: _selected,
-                      onChanged: (v) => setState(() => _selected = v),
+                      onChanged: (v) => _testing
+                          ? null
+                          : setState(() {
+                              _selected = v;
+                              _error = null;
+                            }),
                       child: ListView.builder(
                         itemCount: shown.length,
                         itemBuilder: (_, i) {
@@ -119,20 +159,26 @@ class _ModelPickerState extends State<_ModelPicker> {
                       ),
                     ),
             ),
+            if (_error != null) ...[
+              const SizedBox(height: 8),
+              Text(
+                _error!,
+                key: const Key('model-error'),
+                style: TextStyle(color: theme.colorScheme.error),
+              ),
+            ],
           ],
         ),
       ),
       actions: [
         TextButton(
-          onPressed: () => Navigator.pop(context),
+          onPressed: _testing ? null : () => Navigator.pop(context),
           child: const Text('Cancel'),
         ),
         FilledButton(
           key: const Key('use-model'),
-          onPressed: _selected == null
-              ? null
-              : () => Navigator.pop(context, _selected),
-          child: const Text('Use this model'),
+          onPressed: _selected == null || _testing ? null : _use,
+          child: Text(_testing ? 'Testing the model…' : 'Use this model'),
         ),
       ],
     );

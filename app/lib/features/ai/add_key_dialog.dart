@@ -77,7 +77,11 @@ class _AddKeyDialogState extends ConsumerState<_AddKeyDialog> {
       );
       ref.invalidate(savedKeysProvider);
       if (!mounted) return;
-      final model = await showModelPicker(context, list);
+      final model = await showModelPicker(
+        context,
+        list,
+        test: (m) => repo.testModel(_provider, m),
+      );
       if (model == null || !mounted) return;
       final uid = ref.read(authUserProvider).value!.uid;
       await repo.saveChoice(uid, AiChoice(_provider, model));

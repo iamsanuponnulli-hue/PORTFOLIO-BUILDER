@@ -175,6 +175,10 @@ class AiRepository {
     (await _pb.invoke('keys', 'models', [provider])).get<Object?>(),
   );
 
+  /// Sends [model] one tiny request with the saved key; throws when it can't be used.
+  Future<void> testModel(String provider, String model) async =>
+      (await _pb.invoke('keys', 'test', [provider, model])).get<Object?>();
+
   Future<void> removeKey(String provider) async =>
       (await _pb.invoke('keys', 'remove', [provider])).get<Object?>();
 

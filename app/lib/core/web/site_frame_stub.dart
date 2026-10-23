@@ -11,10 +11,12 @@ class SiteFrame extends StatelessWidget {
     required this.html,
     this.controller,
     this.onMessage,
+    this.scrollKey,
   });
   final String html;
   final SiteFrameController? controller;
   final ValueChanged<Map<String, Object?>>? onMessage;
+  final String? scrollKey;
 
   @override
   Widget build(BuildContext context) =>

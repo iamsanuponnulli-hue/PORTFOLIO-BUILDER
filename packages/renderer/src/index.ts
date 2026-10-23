@@ -27,3 +27,4 @@ export {
 export { codeEditOps, parseSections, CodeError, type CodeEditResult } from './code.ts';
 export { describeChanges } from './diff.ts';
 export { fontFileSlug, findFont } from './fonts.ts';
+export { catalogText } from './prompt.ts';

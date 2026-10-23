@@ -164,6 +164,7 @@ class EditorController extends ChangeNotifier {
       return;
     }
     if (now.key == last.key) return;
+    _loadNewImages(d);
     if (!_restoring) {
       final at = DateTime.now();
       // A burst of edits (typing, dragging a slider) is one undo step.
@@ -277,6 +278,9 @@ class EditorController extends ChangeNotifier {
             ]);
           }
         }
+      case 'key':
+        if (m['action'] == 'undo') undo();
+        if (m['action'] == 'redo') redo();
       case 'select':
         select(m['id'] as String?, scroll: false);
       case 'navigate':
@@ -285,8 +289,9 @@ class EditorController extends ChangeNotifier {
       case 'ready':
         // Keep the page's tool in step after every re-render.
         if (tool != PreviewTool.edit) setTool(tool);
+        // Mark the selection again without scrolling: the page keeps its place.
         if (selected != null) {
-          frame.post({'pb': 'highlight', 'id': selected});
+          frame.post({'pb': 'highlight', 'id': selected, 'scroll': false});
         }
     }
   }
@@ -323,6 +328,25 @@ class EditorController extends ChangeNotifier {
   }
 
   // ---- Rendering ----
+
+  /// Images the content refers to (profile photo, project images).
+  static Set<String> imageIds(ProjectDoc d) => {
+    if (d.content.profile.photo != null) d.content.profile.photo!.assetId,
+    for (final p in d.content.projects)
+      for (final im in p.images) im.assetId,
+  };
+
+  final _lookedUp = <String>{};
+
+  /// A newly added image is stored on this computer before the content points at
+  /// it: load it for the preview. Each id is looked up once, so images that are
+  /// really on another computer don't trigger a reload on every edit.
+  void _loadNewImages(ProjectDoc d) {
+    final fresh = imageIds(d)
+        .where((id) => !assets.containsKey(id) && _lookedUp.add(id))
+        .toList();
+    if (fresh.isNotEmpty) unawaited(refreshAssets());
+  }
 
   Future<void> refreshAssets() async {
     final r = await pb.invoke('files', 'previewAssets', [session.projectId]);

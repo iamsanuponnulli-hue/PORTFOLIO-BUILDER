@@ -19,7 +19,7 @@ import {
   providerInfo,
   type ProviderId,
 } from '@pb/ai';
-import { applyAll, specFromDraft, themeIsReadable } from '@pb/renderer';
+import { applyAll, catalogText, specFromDraft, themeIsReadable } from '@pb/renderer';
 import { sampleState } from '@pb/renderer/samples';
 import { scoreEdit, scoreResume } from './score.ts';
 
@@ -36,7 +36,7 @@ const resumes = data('resumes.json') as { id: string; text: string }[];
 const edits = data('edits.json') as { prompt: string; expect: string[] }[];
 const label = providerInfo(provider).label;
 const lines = ['# Cross-model eval', '', `Provider: ${label}`, ''];
-const catalog = 'See packages/renderer/src/catalog.ts';
+const catalog = catalogText();
 
 for (const id of models) {
   const model = await createModel(

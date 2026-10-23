@@ -1,4 +1,4 @@
-import type { LanguageModel } from 'ai';
+import { wrapLanguageModel, type LanguageModel } from 'ai';
 
 export type ProviderId =
   'gemini' | 'groq' | 'openrouter' | 'anthropic' | 'openai' | 'mistral' | 'custom';
@@ -99,10 +99,70 @@ export interface Credentials {
 }
 
 /**
+ * How long a "thinking" model may think before answering. This app's tasks are
+ * structured edits, not puzzles: low effort answers several times faster with the
+ * same quality. Only set where the provider accepts it for this model; other
+ * models reject the setting (Groq's Llama, OpenAI's GPT-4o) or don't think anyway.
+ */
+export function reasoningFor(provider: ProviderId, modelId: string): 'low' | undefined {
+  const m = modelId.toLowerCase().split('/').at(-1)!;
+  const thinks =
+    provider === 'gemini'
+      ? /^gemini-(2\.5|[3-9])|^gemini-(flash|pro)(-lite)?-latest$/.test(m)
+      : provider === 'groq'
+        ? /gpt-oss|qwen3|deepseek-r1/.test(m)
+        : provider === 'openai'
+          ? /^(o\d|gpt-5)(?!.*chat)/.test(m)
+          : false;
+  return thinks ? 'low' : undefined;
+}
+
+/**
  * Builds an AI SDK model that calls the provider directly from the browser. Each
  * provider's library loads only when it is first used.
  */
 export async function createModel(
+  c: Credentials,
+  modelId: string,
+  fetchImpl?: typeof fetch,
+): Promise<LanguageModel> {
+  const model = await baseModel(c, modelId, fetchImpl);
+  const reasoning = reasoningFor(c.provider, modelId);
+  if (!reasoning || typeof model === 'string') return model;
+  const budget = geminiThinkingBudget(modelId);
+  return wrapLanguageModel({
+    model,
+    middleware: {
+      specificationVersion: 'v4',
+      transformParams: async ({ params }) =>
+        budget === undefined
+          ? { ...params, reasoning: params.reasoning ?? reasoning }
+          : {
+              ...params,
+              providerOptions: {
+                ...params.providerOptions,
+                google: {
+                  thinkingConfig: { thinkingBudget: budget },
+                  ...params.providerOptions?.['google'],
+                },
+              },
+            },
+    },
+  });
+}
+
+/**
+ * Gemini 2.5 takes a token budget; the SDK's "low" maps to a tenth of the model's
+ * output limit (~6.5k tokens), which is slow and can crowd out the answer.
+ */
+export function geminiThinkingBudget(modelId: string): number | undefined {
+  const m = modelId.toLowerCase().split('/').at(-1)!;
+  if (!m.startsWith('gemini-2.5')) return undefined;
+  // Pro can't turn thinking off; Flash thinks well enough in a few hundred tokens.
+  return m.includes('pro') ? 1024 : 512;
+}
+
+async function baseModel(
   c: Credentials,
   modelId: string,
   fetchImpl?: typeof fetch,
@@ -123,6 +183,8 @@ export async function createModel(
         name: 'openrouter',
         baseURL: 'https://openrouter.ai/api/v1',
         apiKey: c.apiKey,
+        // Lets OpenRouter show which app made the request in the person's activity log.
+        headers: { 'X-Title': 'Portfolio Builder' },
         ...f,
       })(modelId);
     }

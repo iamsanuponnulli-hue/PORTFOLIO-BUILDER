@@ -3,7 +3,8 @@
  * The preview runs in a sandboxed iframe without access to the app, so it talks to
  * the editor only with postMessage:
  *   iframe → app  {pb:'edit', target, value} · {pb:'select', id} · {pb:'navigate', page, hash}
- *   app → iframe  {pb:'mode', mode:'edit'|'select'|'view'} · {pb:'highlight', id}
+ *                 · {pb:'key', action:'undo'|'redo'}
+ *   app → iframe  {pb:'mode', mode:'edit'|'select'|'view'} · {pb:'highlight', id, scroll?}
  */
 export const EDITOR_CSS = `
 [data-pb-edit]{cursor:text;border-radius:3px;transition:outline-color .15s}
@@ -74,6 +75,11 @@ export function editorScript(page: string): string {
   },true);
   document.addEventListener('focusout',function(e){if(editing&&e.target===editing)finish(true)});
   document.addEventListener('keydown',function(e){
+    // Undo and redo belong to the editor, unless a text is being edited here.
+    if(!editing&&(e.metaKey||e.ctrlKey)&&!e.altKey){
+      var k=e.key.toLowerCase();
+      if(k==='z'||k==='y'){e.preventDefault();post({pb:'key',action:k==='y'||e.shiftKey?'redo':'undo'});return;}
+    }
     if(!editing)return;
     if(e.key==='Escape'){e.preventDefault();finish(false);}
     else if(e.key==='Enter'&&!e.shiftKey&&!editing.matches('.pb-prose,blockquote,blockquote *')){e.preventDefault();editing.blur();}
@@ -85,7 +91,7 @@ export function editorScript(page: string): string {
     if(m.pb==='highlight'){
       var s=m.id&&document.getElementById(m.id);
       document.querySelectorAll('.pb-selected').forEach(function(x){x.classList.remove('pb-selected')});
-      if(s){s.classList.add('pb-selected');s.scrollIntoView({behavior:'smooth',block:'start'});}
+      if(s){s.classList.add('pb-selected');if(m.scroll!==false)s.scrollIntoView({behavior:'smooth',block:'start'});}
     }
   });
   post({pb:'ready',page:PAGE});
