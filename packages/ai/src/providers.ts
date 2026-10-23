@@ -127,6 +127,26 @@ export async function createModel(
   fetchImpl?: typeof fetch,
 ): Promise<LanguageModel> {
   const model = await baseModel(c, modelId, fetchImpl);
+  if (c.provider === 'openrouter' && typeof model !== 'string')
+    // OpenRouter's own setting, passed through as is: every free model there
+    // thinks before answering, at length unless told otherwise. Models that don't
+    // think ignore it. The thinking itself isn't sent back.
+    return wrapLanguageModel({
+      model,
+      middleware: {
+        specificationVersion: 'v4',
+        transformParams: async ({ params }) => ({
+          ...params,
+          providerOptions: {
+            ...params.providerOptions,
+            openrouter: {
+              reasoning: { effort: 'low', exclude: true },
+              ...params.providerOptions?.['openrouter'],
+            },
+          },
+        }),
+      },
+    });
   const reasoning = reasoningFor(c.provider, modelId);
   if (!reasoning || typeof model === 'string') return model;
   const budget = geminiThinkingBudget(modelId);

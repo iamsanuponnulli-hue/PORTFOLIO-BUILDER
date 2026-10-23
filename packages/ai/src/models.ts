@@ -93,7 +93,7 @@ async function getJson(
 
 /** Model families that can't answer a text request (or are retired), hidden from the list. */
 const NOT_FOR_TEXT =
-  /embed|aqa|imagen|veo|tts|audio|live|image|vision-only|computer-use|robotics|learnlm|whisper|dall-e|moderation|guard|transcribe|realtime|search|^gemini-1\.|^gemini-pro$|^gemini-2\.0-.*(exp|thinking)/i;
+  /embed|aqa|imagen|veo|tts|audio|live|image|vision-only|computer-use|robotics|learnlm|whisper|dall-e|moderation|guard|safety|lyria|transcribe|realtime|search|^gemini-1\.|^gemini-pro$|^gemini-2\.0-.*(exp|thinking)/i;
 
 type Row = { id: string; label?: string; free?: boolean };
 
@@ -142,7 +142,8 @@ export async function listModels(
         .filter(
           (m) =>
             !NOT_FOR_TEXT.test(m.id.split('/').at(-1)!) &&
-            (m.architecture?.output_modalities ?? ['text']).includes('text'),
+            // Text only: music and image models also list "text" as an output.
+            (m.architecture?.output_modalities ?? ['text']).join() === 'text',
         )
         .map((m) => ({
           id: m.id,
@@ -199,7 +200,18 @@ export function suggestModel(provider: ProviderId, models: ModelInfo[]): ModelIn
   const prefs: Record<ProviderId, RegExp[]> = {
     gemini: [/^gemini-[\d.]+-flash$/, /flash(?!.*(lite|8b|preview|exp))/, /flash/, /gemini/],
     groq: [/gpt-oss-120b/, /llama.*70b/, /llama-4/, /./],
-    openrouter: [/:free$/],
+    // The free line-up changes often: prefer well-known general model families,
+    // then OpenRouter's own free router, then anything free.
+    openrouter: [
+      /gemini.*flash/,
+      /gpt-oss-120b/,
+      /gemma-\d+-(2[6-9]|[3-9]\d)b/,
+      /llama.*70b/,
+      /deepseek/,
+      /qwen/,
+      /^openrouter\/free$/,
+      /./,
+    ],
     anthropic: [/sonnet/, /haiku/, /opus/],
     openai: [/gpt-5(?!.*(nano|mini))/, /gpt-4\.1(?!.*(nano|mini))/, /gpt-4o(?!-mini)/, /gpt/],
     mistral: [/mistral-large/, /mistral-medium/, /mistral/],
@@ -207,7 +219,9 @@ export function suggestModel(provider: ProviderId, models: ModelInfo[]): ModelIn
   };
   const pool = provider === 'openrouter' ? models.filter((m) => m.free) : models;
   for (const re of prefs[provider]) {
-    const hits = pool.filter((m) => re.test(m.id) && m.capabilities.smart);
+    const hits = pool.filter(
+      (m) => re.test(m.id) && m.capabilities.smart && !/code|coder|preview/.test(m.id),
+    );
     const rec = hits.filter((m) => m.status === 'recommended');
     if (rec.length) return rec.sort((a, b) => b.id.localeCompare(a.id))[0];
     if (hits.length) return hits.sort((a, b) => b.id.localeCompare(a.id))[0];
@@ -222,15 +236,34 @@ export { providerInfo };
  * blocked by privacy settings, rejects a setting) fails here and not halfway
  * through a task. Returns how long the answer took.
  */
-export async function testModel(c: Credentials, modelId: string): Promise<{ ms: number }> {
+export const TEST_TIMEOUT_MS = 30_000;
+
+export async function testModel(
+  c: Credentials,
+  modelId: string,
+  opts: { fetchImpl?: typeof fetch; timeoutMs?: number } = {},
+): Promise<{ ms: number }> {
   const started = Date.now();
-  await runJsonTask({
-    model: await createModel(c, modelId),
-    providerLabel: providerInfo(c.provider).label,
-    system: 'You check that a connection works.',
-    content: 'Reply with {"ok":true}',
-    schema: z.object({ ok: z.boolean() }),
-    maxOutputTokens: 1024,
-  });
+  const label = providerInfo(c.provider).label;
+  const timeoutMs = opts.timeoutMs ?? TEST_TIMEOUT_MS;
+  try {
+    await runJsonTask({
+      signal: AbortSignal.timeout(timeoutMs),
+      model: await createModel(c, modelId, opts.fetchImpl),
+      providerLabel: label,
+      system: 'You check that a connection works.',
+      content: 'Reply with {"ok":true}',
+      schema: z.object({ ok: z.boolean() }),
+      maxOutputTokens: 1024,
+    });
+  } catch (e) {
+    // A model that can't answer "ok" in 30 seconds is too slow (or down) for this app.
+    if ((e as AiError).code === 'timeout')
+      throw new AiError(
+        'timeout',
+        `This model didn't answer within ${Math.round(timeoutMs / 1000)} seconds: it's busy or unavailable on ${label} right now. Pick another one.`,
+      );
+    throw e;
+  }
   return { ms: Date.now() - started };
 }

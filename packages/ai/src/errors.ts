@@ -83,7 +83,7 @@ export function httpError(
         'model_unavailable',
         `This model isn't included in ${providerLabel}'s free tier. Pick another model (a "Flash" model usually is).`,
       );
-    if (/per[ _]?day|daily/i.test(body))
+    if (/per[ _-]?day|daily/i.test(body))
       return new AiError(
         'rate_limited',
         `You've used today's free allowance for this model on ${providerLabel}. Try again tomorrow, or pick another model.`,
