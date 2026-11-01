@@ -4,6 +4,8 @@
  *
  * The app's addresses (where the relay script runs) come from PB_APP_ORIGINS,
  * comma-separated, e.g. PB_APP_ORIGINS=https://my-project.web.app,https://my.domain
+ * Without it, the build is for local development only (localhost, any port) and
+ * no store zip is written, so a development build can't be published by mistake.
  */
 import { Buffer } from 'node:buffer';
 import process from 'node:process';
@@ -20,10 +22,8 @@ const out = resolve(root, 'dist');
 rmSync(out, { recursive: true, force: true });
 mkdirSync(out, { recursive: true });
 
-const origins = (
-  process.env.PB_APP_ORIGINS ??
-  'http://localhost,http://127.0.0.1,https://demo-portfolio-builder.web.app,https://demo-portfolio-builder.firebaseapp.com'
-)
+const release = !!process.env.PB_APP_ORIGINS?.trim();
+const origins = (release ? process.env.PB_APP_ORIGINS : 'http://localhost,http://127.0.0.1')
   .split(',')
   .map((o) => o.trim().replace(/\/+$/, ''))
   .filter(Boolean);
@@ -125,7 +125,14 @@ const manifest = {
 };
 writeFileSync(resolve(out, 'manifest.json'), JSON.stringify(manifest, null, 2) + '\n');
 
-const files = {};
-for (const f of readdirSync(out)) files[f] = new Uint8Array(readFileSync(resolve(out, f)));
-writeFileSync(resolve(root, 'portfolio-builder-extension.zip'), zipSync(files, { level: 9 }));
-process.stdout.write(`extension built for ${origins.join(', ')}\n`);
+const zip = resolve(root, 'portfolio-builder-extension.zip');
+rmSync(zip, { force: true });
+if (release) {
+  const files = {};
+  for (const f of readdirSync(out)) files[f] = new Uint8Array(readFileSync(resolve(out, f)));
+  writeFileSync(zip, zipSync(files, { level: 9 }));
+}
+process.stdout.write(
+  `extension built for ${origins.join(', ')}` +
+    (release ? '\n' : ' (development only: set PB_APP_ORIGINS for a store zip)\n'),
+);

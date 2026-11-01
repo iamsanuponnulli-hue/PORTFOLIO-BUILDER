@@ -2,18 +2,30 @@ import { describe, expect, it } from 'vitest';
 import { client, serve, type Port } from '../src/rpc.ts';
 import { workerHandlers } from '../src/handlers.ts';
 
+type Listener = (e: MessageEvent) => void;
+
 /** Two connected in-memory ports, like a page and its worker. */
-function pair(): [Port, Port] {
-  const listeners: [((e: MessageEvent) => void)[], ((e: MessageEvent) => void)[]] = [[], []];
-  const make = (me: 0 | 1): Port => ({
-    postMessage: (data) =>
+function pair(): [Port & { crash(): void }, Port] {
+  const listeners: [Listener[], Listener[]] = [[], []];
+  const errors: Listener[] = [];
+  const make = (me: 0 | 1) => ({
+    postMessage: (data: unknown) =>
       queueMicrotask(() => listeners[me === 0 ? 1 : 0].forEach((l) => l({ data } as MessageEvent))),
-    addEventListener: (_t, l) => listeners[me].push(l),
+    addEventListener: (t: string, l: Listener) => (t === 'error' ? errors : listeners[me]).push(l),
+    crash: () => errors.forEach((l) => l({ message: 'boom' } as unknown as MessageEvent)),
   });
-  return [make(0), make(1)];
+  return [make(0) as Port & { crash(): void }, make(1) as Port];
 }
 
 describe('worker rpc', () => {
+  it('fails waiting calls at once when the worker crashes', async () => {
+    const [page] = pair(); // nothing serves: the call would wait for its timeout
+    const call = client(page, 60_000);
+    const waiting = call('ping');
+    page.crash();
+    await expect(waiting).rejects.toThrow('boom');
+  });
+
   it('calls a handler and returns its value', async () => {
     const [page, worker] = pair();
     serve(worker, workerHandlers);

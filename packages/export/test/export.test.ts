@@ -56,11 +56,11 @@ describe('site export', () => {
         'resume.pdf',
         'README.md',
         `assets/img/${photo}.jpg`,
-        `assets/img/${photo}-480.webp`,
+        `assets/img/${photo}-480.jpg`,
       ]),
     );
     const html = text(out.files['index.html']);
-    expect(html).toContain(`assets/img/${photo}-480.webp 480w`);
+    expect(html).toContain(`assets/img/${photo}-480.jpg 480w`);
     expect(html).toContain('href="resume.pdf" download');
     for (const m of html.matchAll(/(?:href|src)="(assets\/[^"]+|favicon\.ico)"/g))
       expect(paths).toContain(m[1]);

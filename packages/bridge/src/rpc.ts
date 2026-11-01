@@ -6,6 +6,8 @@
 export interface Port {
   postMessage(message: unknown, transfer?: Transferable[]): void;
   addEventListener(type: 'message', listener: (e: MessageEvent) => void): void;
+  /** Workers report a crash (e.g. a script that failed to load) with 'error'. */
+  addEventListener(type: 'error', listener: (e: Event) => void): void;
 }
 
 type Request = { id: number; method: string; args: unknown[] };
@@ -58,6 +60,12 @@ export function client(port: Port, timeoutMs = 60_000) {
     pending.delete(res.id);
     if (res.ok) p.resolve(res.value);
     else p.reject(new WorkerError(res.error, res.code));
+  });
+  // A crashed worker never answers: fail what's waiting instead of timing out.
+  port.addEventListener('error', (e) => {
+    const message = (e as ErrorEvent).message || 'The background worker stopped.';
+    for (const p of pending.values()) p.reject(new Error(message));
+    pending.clear();
   });
   return function call<T>(method: string, ...args: unknown[]): Promise<T> {
     const id = next++;

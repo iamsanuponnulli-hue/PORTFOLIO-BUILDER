@@ -69,12 +69,12 @@ export function buildSite(input: ExportInput): ExportResult {
     const widths = Object.keys(im.variants ?? {})
       .map(Number)
       .sort((a, b) => a - b);
-    for (const w of widths) files[`${base}-${w}.webp`] = im.variants![w]!;
+    for (const w of widths) files[`${base}-${w}.${ext}`] = im.variants![w]!;
     assets[im.fileId] = {
       src: `${base}.${ext}`,
       ...(im.width && im.height ? { width: im.width, height: im.height } : {}),
       ...(widths.length > 1
-        ? { srcset: widths.map((w) => `${base}-${w}.webp ${w}w`).join(', ') }
+        ? { srcset: widths.map((w) => `${base}-${w}.${ext} ${w}w`).join(', ') }
         : {}),
     };
   }

@@ -640,9 +640,11 @@ function createBridge(scriptSrc: string) {
             name?: string;
             alt?: string;
           }[]) {
+            // Variants share the image's type: WebP, or JPEG where the browser
+            // that made them couldn't write WebP.
             const variants: Record<number, Blob> = {};
             for (const [w, d] of Object.entries(raw.variants ?? {}))
-              variants[Number(w)] = new Blob([d], { type: 'image/webp' });
+              variants[Number(w)] = new Blob([d], { type: raw.mediaType });
             await s.files.put({
               projectId,
               fileId: raw.fileId,
