@@ -461,8 +461,8 @@ const editorText = await page.evaluate(async () => {
 });
 check('code editor loads on demand', editorText === 'p {}|mounted', editorText);
 
-// Device data is removed on sign-out.
-await pb(`pb.clearDevice()`);
+// Device data is removed when the account is deleted.
+await pb(`pb.device.clear()`);
 const afterClear = await pb(`pb.keys.list()`);
 check(
   'clearing the device removes keys',

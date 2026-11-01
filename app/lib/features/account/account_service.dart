@@ -14,9 +14,10 @@ class RecentSignInRequired implements Exception {
 /// Deletes an account and everything it owns.
 ///
 /// There is no server function on the free plan, so the app does the cleanup:
-/// projects (with their history) first, then the user document, then the sign-in
-/// account itself. Firebase only deletes accounts that signed in recently, so that
-/// is checked up front — otherwise the data could be gone while the account stays.
+/// projects (with their history) first, then the user document, then what this
+/// device keeps (keys, images, resume, drafts), then the sign-in account itself.
+/// Firebase only deletes accounts that signed in recently, so that is checked up
+/// front — otherwise the data could be gone while the account stays.
 class AccountService {
   AccountService(
     this._auth,
@@ -24,6 +25,7 @@ class AccountService {
     this._projects, {
     DateTime Function()? clock,
     this.signedInAt,
+    this.clearDevice,
   }) : _clock = clock ?? DateTime.now;
 
   final FirebaseAuth _auth;
@@ -33,6 +35,9 @@ class AccountService {
 
   /// When the current sign-in happened (overridable in tests).
   final Future<DateTime?> Function()? signedInAt;
+
+  /// Deletes this user's on-device data.
+  final Future<void> Function()? clearDevice;
 
   static const recentWindow = Duration(minutes: 5);
 
@@ -50,6 +55,7 @@ class AccountService {
       await _projects.delete(uid: user.uid, entry: p);
     }
     await _users.delete(user.uid);
+    await clearDevice?.call();
     await user.delete();
   }
 }

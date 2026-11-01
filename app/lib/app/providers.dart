@@ -45,6 +45,9 @@ final accountServiceProvider = Provider<AccountService>(
     ref.watch(firebaseAuthProvider),
     ref.watch(userRepositoryProvider),
     ref.watch(projectRepositoryProvider),
+    clearDevice: () async =>
+        (await ref.read(pbBridgeProvider).invoke('device', 'clear'))
+            .get<Object?>(),
   ),
 );
 

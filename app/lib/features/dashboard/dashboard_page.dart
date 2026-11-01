@@ -246,10 +246,17 @@ class _ProjectCard extends ConsumerWidget {
           final ok = await confirm(
             context,
             title: 'Delete "${entry.doc.name}"?',
-            message: 'This deletes the portfolio and its history. It can\'t be undone.',
+            message:
+                'This deletes the portfolio, its history and its images on this computer. '
+                'It can\'t be undone.',
             action: 'Delete',
           );
-          if (ok) await repo.delete(uid: uid, entry: entry);
+          if (ok) {
+            await repo.delete(uid: uid, entry: entry);
+            await ref.read(pbBridgeProvider).invoke('files', 'removeProject', [
+              entry.id,
+            ]);
+          }
       }
     } on ProjectLimitReached catch (e) {
       if (context.mounted) showMessage(context, e.toString());

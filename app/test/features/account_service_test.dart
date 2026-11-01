@@ -10,9 +10,12 @@ import '../helpers.dart';
 void main() {
   final now = DateTime(2026, 10, 12, 10);
 
+  var deviceCleared = false;
+
   Future<(FakeFirebaseFirestore, MockFirebaseAuth, AccountService)> setUpWith(
     DateTime signedInAt,
   ) async {
+    deviceCleared = false;
     final db = FakeFirebaseFirestore();
     final user = MockUser(
       uid: 'alice',
@@ -45,18 +48,23 @@ void main() {
       projects,
       clock: () => now,
       signedInAt: () async => signedInAt,
+      clearDevice: () async => deviceCleared = true,
     );
     return (db, auth, service);
   }
 
-  test('deletes projects, the user document and the account', () async {
-    final (db, auth, service) = await setUpWith(
-      now.subtract(const Duration(minutes: 1)),
-    );
-    await service.deleteAccount();
-    expect((await db.collection('projects').get()).docs, isEmpty);
-    expect((await db.doc('users/alice').get()).exists, isFalse);
-  });
+  test(
+    'deletes projects, the user document, device data and the account',
+    () async {
+      final (db, auth, service) = await setUpWith(
+        now.subtract(const Duration(minutes: 1)),
+      );
+      await service.deleteAccount();
+      expect((await db.collection('projects').get()).docs, isEmpty);
+      expect((await db.doc('users/alice').get()).exists, isFalse);
+      expect(deviceCleared, isTrue);
+    },
+  );
 
   test('refuses before touching data when the sign-in is old', () async {
     final (db, auth, service) = await setUpWith(
@@ -68,5 +76,6 @@ void main() {
     );
     expect((await db.collection('projects').get()).docs, hasLength(1));
     expect(auth.currentUser, isNotNull);
+    expect(deviceCleared, isFalse);
   });
 }

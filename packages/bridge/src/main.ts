@@ -568,8 +568,13 @@ function createBridge(scriptSrc: string) {
           const f = await (await local()).files.get(projectId, 'resume');
           return f?.mediaType === 'application/pdf';
         }),
+      /** Deletes a project's images, resume and unsynced edits from this device. */
       removeProject: (projectId: string) =>
-        result(async () => (await local()).files.removeProject(projectId)),
+        result(async () => {
+          const s = await local();
+          await s.files.removeProject(projectId);
+          await s.drafts.remove(projectId);
+        }),
     },
 
     /** The downloadable site, built in the worker. */
@@ -700,8 +705,20 @@ function createBridge(scriptSrc: string) {
       remove: (projectId: string) => result(async () => (await local()).drafts.remove(projectId)),
     },
 
-    /** Deletes everything kept on this device (sign-out, account deletion). */
-    clearDevice: () => result(async () => (await local()).clearAll()),
+    device: {
+      /** Deletes everything this user keeps on this device (account deletion). */
+      clear: () =>
+        result(async () => {
+          await (await local()).clearAll();
+          try {
+            const prefix = `pb:${user}:`;
+            for (const k of Object.keys(localStorage))
+              if (k.startsWith(prefix)) localStorage.removeItem(k);
+          } catch {
+            // storage unavailable (private mode): nothing was kept there
+          }
+        }),
+    },
   };
 }
 
