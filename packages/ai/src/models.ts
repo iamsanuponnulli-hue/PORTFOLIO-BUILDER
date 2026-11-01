@@ -246,10 +246,27 @@ export async function testModel(
   const started = Date.now();
   const label = providerInfo(c.provider).label;
   const timeoutMs = opts.timeoutMs ?? TEST_TIMEOUT_MS;
+  // The SDK retries a refusal (e.g. 429 with Retry-After), so a test can time out
+  // while waiting; remember the refusal to show it instead of "no answer".
+  const base = opts.fetchImpl ?? fetch;
+  let refused: { status: number; body: string; headers: Record<string, string> } | undefined;
+  const recording: typeof fetch = async (input, init) => {
+    const res = await base(input, init);
+    if (!res.ok)
+      refused = {
+        status: res.status,
+        body: await res
+          .clone()
+          .text()
+          .catch(() => ''),
+        headers: Object.fromEntries(res.headers.entries()),
+      };
+    return res;
+  };
   try {
     await runJsonTask({
       signal: AbortSignal.timeout(timeoutMs),
-      model: await createModel(c, modelId, opts.fetchImpl),
+      model: await createModel(c, modelId, recording),
       providerLabel: label,
       system: 'You check that a connection works.',
       content: 'Reply with {"ok":true}',
@@ -258,6 +275,8 @@ export async function testModel(
       maxOutputTokens: 4096,
     });
   } catch (e) {
+    if ((e as AiError).code === 'timeout' && refused)
+      throw httpError(refused.status, label, refused.body, refused.headers);
     // A model that can't answer "ok" in 30 seconds is too slow (or down) for this app.
     if ((e as AiError).code === 'timeout')
       throw new AiError(

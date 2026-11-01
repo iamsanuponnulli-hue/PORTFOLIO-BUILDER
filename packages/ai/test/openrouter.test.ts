@@ -111,4 +111,23 @@ describe('OpenRouter', () => {
     await expect(slow).rejects.toMatchObject({ code: 'timeout' });
     expect(Date.now() - started).toBeLessThan(2000);
   });
+
+  it("shows the provider's refusal when a test times out waiting to retry", async () => {
+    // Gemini's free tier refusing, with a wait the SDK honours before retrying.
+    const f = (async () =>
+      new Response(
+        JSON.stringify({
+          error: { code: 429, message: 'Quota exceeded for metric ... Please retry in 20s.' },
+        }),
+        { status: 429, headers: { 'content-type': 'application/json', 'retry-after': '20' } },
+      )) as typeof fetch;
+    const started = Date.now();
+    const test = testModel({ provider: 'gemini', apiKey: 'k' }, 'gemini-2.5-flash', {
+      fetchImpl: f,
+      timeoutMs: 200,
+    });
+    await expect(test).rejects.toMatchObject({ code: 'rate_limited' });
+    await expect(test).rejects.toThrow(/20 seconds/);
+    expect(Date.now() - started).toBeLessThan(2000);
+  });
 });
