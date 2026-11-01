@@ -6,6 +6,7 @@ import '../../app/providers.dart';
 import '../../models/profile_types.dart';
 import '../project/drafts.dart';
 import '../project/project_session.dart';
+import '../project/sync_banner.dart';
 import 'steps/content_step.dart';
 import 'steps/goals_step.dart';
 import 'steps/import_step.dart';
@@ -89,18 +90,7 @@ class _SetupPageState extends ConsumerState<SetupPage> {
                   onTap: go,
                   profile: doc!.profileType.label,
                 ),
-                if (session.syncState == SyncState.conflict)
-                  MaterialBanner(
-                    content: const Text(
-                      'This portfolio was changed in another tab or device.',
-                    ),
-                    actions: [
-                      TextButton(
-                        onPressed: session.reload,
-                        child: const Text('Load the newer version'),
-                      ),
-                    ],
-                  ),
+                SyncBanner(session: session),
                 Expanded(
                   child: SingleChildScrollView(
                     padding: const EdgeInsets.all(24),
@@ -200,6 +190,7 @@ class SyncIndicator extends StatelessWidget {
         'Offline · will sync later',
       ),
       SyncState.conflict => (Icons.warning_amber_outlined, 'Changed elsewhere'),
+      SyncState.rejected => (Icons.error_outline, 'Not saved to the cloud'),
       SyncState.dailyLimit => (
         Icons.cloud_off_outlined,
         'Saved here · syncs tomorrow',

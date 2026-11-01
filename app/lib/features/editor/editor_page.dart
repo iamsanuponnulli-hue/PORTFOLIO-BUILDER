@@ -10,6 +10,7 @@ import '../assistant/assistant_panel.dart';
 import '../export/export_dialog.dart';
 import '../project/drafts.dart';
 import '../project/project_session.dart';
+import '../project/sync_banner.dart';
 import '../score/score.dart';
 import '../setup/setup_page.dart';
 import '../setup/steps/content_step.dart';
@@ -335,18 +336,10 @@ class _EditorPageState extends ConsumerState<EditorPage>
         _ => Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            if (session.syncState == SyncState.conflict)
-              MaterialBanner(
-                content: const Text(
-                  'This portfolio was changed in another tab or device.',
-                ),
-                actions: [
-                  TextButton(
-                    onPressed: session.reload,
-                    child: const Text('Load the newer version'),
-                  ),
-                ],
-              ),
+            SyncBanner(
+              session: session,
+              onBackup: () => downloadBackup(context, editor),
+            ),
             if (session.syncState == SyncState.dailyLimit)
               MaterialBanner(
                 content: const Text(

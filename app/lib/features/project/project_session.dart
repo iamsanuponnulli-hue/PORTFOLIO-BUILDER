@@ -2,22 +2,37 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 
+import '../../core/web/browser.dart';
 import '../../models/generated/models.dart';
 import '../dashboard/project_repository.dart';
 import 'drafts.dart';
 
-enum SyncState { synced, savedOnDevice, syncing, conflict, offline, dailyLimit }
+enum SyncState {
+  synced,
+  savedOnDevice,
+  syncing,
+
+  /// The cloud copy changed elsewhere: the person keeps theirs or loads the newer one.
+  conflict,
+
+  /// The cloud refused the save for another reason; edits stay on this device.
+  rejected,
+  offline,
+  dailyLimit,
+}
 
 /// One open project, saved local-first: every edit is kept on this device at once,
 /// and synced to Firestore at most every [syncEvery] (and on [flush]) to stay
-/// within the free plan's daily write allowance.
+/// within the free plan's daily write allowance. Leaving the page syncs at once.
 class ProjectSession extends ChangeNotifier {
   ProjectSession({
     required this.projectId,
     required this.repo,
     required this.drafts,
     this.syncEvery = const Duration(seconds: 30),
-  });
+  }) {
+    _stopWatchingPage = onPageHidden(() => unawaited(flush()));
+  }
 
   final String projectId;
   final ProjectRepository repo;
@@ -28,6 +43,7 @@ class ProjectSession extends ChangeNotifier {
   int _baseRevision = 0;
   var _sync = SyncState.synced;
   Timer? _timer;
+  late final void Function() _stopWatchingPage;
   Future<void>? _flushing;
   bool _disposed = false;
   bool restoredDraft = false;
@@ -50,14 +66,16 @@ class ProjectSession extends ChangeNotifier {
     _baseRevision = entry.doc.revision;
     final draft = await drafts.get(projectId);
     if (draft != null) {
+      _doc = parseProject({...entry.doc.toJson(), ...draft.data});
+      restoredDraft = true;
       if (draft.baseRevision == _baseRevision) {
-        _doc = parseProject({...entry.doc.toJson(), ...draft.data});
-        restoredDraft = true;
         _sync = SyncState.savedOnDevice;
         _schedule();
       } else {
-        // The cloud copy moved on (edited elsewhere): it wins.
-        await drafts.remove(projectId);
+        // The cloud copy moved on while these edits waited on this device: show
+        // them, and let the person keep them or load the newer version.
+        _baseRevision = draft.baseRevision;
+        _sync = SyncState.conflict;
       }
     }
     _notify();
@@ -68,10 +86,21 @@ class ProjectSession extends ChangeNotifier {
     final current = _doc;
     if (current == null) return;
     _doc = change(current);
-    _sync = SyncState.savedOnDevice;
+    unawaited(_saveDraft());
+    // In a conflict, edits wait on this device until the person decides.
+    if (_sync != SyncState.conflict) {
+      _sync = SyncState.savedOnDevice;
+      _schedule();
+    }
     _notify();
-    unawaited(drafts.save(projectId, _baseRevision, _editable(_doc!)));
-    _schedule();
+  }
+
+  Future<void> _saveDraft() async {
+    try {
+      await drafts.save(projectId, _baseRevision, _editable(_doc!));
+    } catch (e) {
+      debugPrint("Couldn't keep edits on this device: $e");
+    }
   }
 
   /// Syncs now (call before leaving a screen).
@@ -102,6 +131,8 @@ class ProjectSession extends ChangeNotifier {
       }
     } on StaleWrite {
       _sync = SyncState.conflict;
+    } on SaveRejected {
+      _sync = SyncState.rejected;
     } on DailyLimitReached {
       // Firestore's free daily writes are used up: keep everything on this
       // device and try again in an hour (the allowance resets daily).
@@ -113,6 +144,16 @@ class ProjectSession extends ChangeNotifier {
       _schedule();
     }
     _notify();
+  }
+
+  /// Keeps this device's edits after a conflict: they replace the newer cloud copy.
+  Future<void> keepMine() async {
+    final entry = await repo.get(projectId);
+    if (entry == null || _doc == null) return;
+    _baseRevision = entry.doc.revision;
+    _sync = SyncState.savedOnDevice;
+    await _saveDraft();
+    await flush();
   }
 
   /// Discards local edits and reloads the cloud copy (after a conflict).
@@ -141,6 +182,7 @@ class ProjectSession extends ChangeNotifier {
   void dispose() {
     _disposed = true;
     _timer?.cancel();
+    _stopWatchingPage();
     super.dispose();
   }
 }

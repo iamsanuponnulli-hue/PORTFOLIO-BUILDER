@@ -15,6 +15,12 @@ class StaleWrite implements Exception {
   const StaleWrite();
 }
 
+/// The cloud refused the write for another reason (e.g. a field the security
+/// rules don't allow): retrying the same data won't help.
+class SaveRejected implements Exception {
+  const SaveRejected();
+}
+
 /// Firestore's free daily write allowance is used up: edits stay on this device.
 class DailyLimitReached implements Exception {
   const DailyLimitReached();
@@ -170,7 +176,8 @@ class ProjectRepository {
       });
 
   /// Writes a locally edited project. Security rules require the revision to move
-  /// on by exactly one, so a stale copy can never overwrite newer changes.
+  /// on by exactly one, so a stale copy can never overwrite newer changes. A
+  /// refusal is [StaleWrite] only when the cloud copy really moved on.
   Future<int> saveWorking(String id, ProjectDoc doc, int baseRevision) async {
     final revision = baseRevision + 1;
     final j = doc.toJson();
@@ -181,7 +188,13 @@ class ProjectRepository {
         'updatedAt': _now,
       });
     } on FirebaseException catch (e) {
-      if (e.code == 'permission-denied') throw const StaleWrite();
+      if (e.code == 'permission-denied') {
+        final now = await get(id).catchError((_) => null);
+        if (now == null || now.doc.revision != baseRevision) {
+          throw const StaleWrite();
+        }
+        throw const SaveRejected();
+      }
       if (e.code == 'resource-exhausted') throw const DailyLimitReached();
       rethrow;
     }
