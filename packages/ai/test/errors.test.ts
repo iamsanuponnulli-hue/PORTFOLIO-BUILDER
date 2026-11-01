@@ -25,6 +25,29 @@ const http = (statusCode: number, body: unknown, isRetryable = false) =>
 const code = (e: unknown) => toAiError(e, 'Google Gemini').code;
 
 describe('provider errors', () => {
+  it('keeps the reason when Gemini refuses a working key', () => {
+    const disabled = toAiError(
+      http(403, {
+        error: {
+          message:
+            'Generative Language API has not been used in project 123 before or it is disabled.',
+        },
+      }),
+      'Google Gemini',
+    );
+    expect(disabled.code).toBe('model_unavailable');
+    expect(disabled.message).toContain('has not been used in project');
+    expect(code(http(403, { error: { message: 'Permission denied: API key invalid' } }))).toBe(
+      'invalid_key',
+    );
+    const region = toAiError(
+      http(400, { error: { message: 'User location is not supported for the API use.' } }),
+      'Google Gemini',
+    );
+    expect(region.code).toBe('model_unavailable');
+    expect(region.message).toContain('region');
+  });
+
   it('reads what the provider said', () => {
     // Gemini answers 400, not 401, for a bad key.
     expect(
@@ -133,6 +156,7 @@ describe('reasoning effort', () => {
     expect(reasoningFor('gemini', 'gemini-2.5-flash')).toBe('low');
     expect(reasoningFor('gemini', 'gemini-3-pro-preview')).toBe('low');
     expect(reasoningFor('gemini', 'gemini-2.0-flash')).toBeUndefined();
+    expect(reasoningFor('gemini', 'gemini-flash-latest')).toBeUndefined();
     expect(reasoningFor('groq', 'openai/gpt-oss-120b')).toBe('low');
     expect(reasoningFor('groq', 'llama-3.3-70b-versatile')).toBeUndefined();
     expect(reasoningFor('openai', 'gpt-5-mini')).toBe('low');

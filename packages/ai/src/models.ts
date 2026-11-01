@@ -254,7 +254,8 @@ export async function testModel(
       system: 'You check that a connection works.',
       content: 'Reply with {"ok":true}',
       schema: z.object({ ok: z.boolean() }),
-      maxOutputTokens: 1024,
+      // Gemini counts thinking toward this limit (Pro thinks up to 1024 tokens).
+      maxOutputTokens: 4096,
     });
   } catch (e) {
     // A model that can't answer "ok" in 30 seconds is too slow (or down) for this app.

@@ -71,10 +71,26 @@ export function httpError(
   const detail = providerMessage(body);
   const said = detail ? ` ${providerLabel} said: "${detail}"` : '';
   // Gemini answers 400 (not 401) for a bad key.
-  if (status === 401 || status === 403 || (status === 400 && KEY_PROBLEM.test(detail)))
+  if (status === 401 || (status === 400 && KEY_PROBLEM.test(detail)))
     return new AiError(
       'invalid_key',
       `${providerLabel} rejected the key. Make sure you copied all of it, or create a new one.`,
+    );
+  // 403 is also "the API isn't enabled for this key's project" or "not available
+  // in your region": keep the provider's own words so the cause is visible.
+  if (status === 403)
+    return new AiError(
+      KEY_PROBLEM.test(detail) || !detail ? 'invalid_key' : 'model_unavailable',
+      `${providerLabel} refused this key.${said || ' Make sure you copied all of it, or create a new one.'}`,
+    );
+  // Gemini isn't offered in every country (400 FAILED_PRECONDITION).
+  if (
+    status === 400 &&
+    /location is not supported|not available in your (country|region)/i.test(detail)
+  )
+    return new AiError(
+      'model_unavailable',
+      `${providerLabel} isn't available in your region.${said} Try another provider, such as Groq or OpenRouter.`,
     );
   if (status === 429) {
     // A quota of 0 means the model isn't part of the free tier at all; waiting won't help.

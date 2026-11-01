@@ -108,7 +108,9 @@ export function reasoningFor(provider: ProviderId, modelId: string): 'low' | und
   const m = modelId.toLowerCase().split('/').at(-1)!;
   const thinks =
     provider === 'gemini'
-      ? /^gemini-(2\.5|[3-9])|^gemini-(flash|pro)(-lite)?-latest$/.test(m)
+      ? // Not the -latest aliases: Google moves them between model generations,
+        // and a 2.5 model rejects the setting a 3 model takes (and vice versa).
+        /^gemini-(2\.5|[3-9])/.test(m)
       : provider === 'groq'
         ? /gpt-oss|qwen3|deepseek-r1/.test(m)
         : provider === 'openai'
