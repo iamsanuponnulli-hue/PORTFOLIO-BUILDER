@@ -5,6 +5,8 @@ export {
   listModels,
   testModel,
   suggestModel,
+  suggestWorkingModel,
+  rankModels,
   type Capabilities,
   type ModelInfo,
   modelStatus,

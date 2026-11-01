@@ -186,7 +186,9 @@ class _AddKeyDialogState extends ConsumerState<_AddKeyDialog> {
         FilledButton(
           key: const Key('save-key'),
           onPressed: _busy ? null : _save,
-          child: Text(_busy ? 'Checking…' : 'Check and save'),
+          child: Text(
+            _busy ? 'Finding a model that answers…' : 'Check and save',
+          ),
         ),
       ],
     );

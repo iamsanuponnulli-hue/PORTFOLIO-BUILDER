@@ -197,6 +197,11 @@ export async function listModels(
 
 /** Picks a sensible default model from a provider's list (free and capable first). */
 export function suggestModel(provider: ProviderId, models: ModelInfo[]): ModelInfo | undefined {
+  return rankModels(provider, models)[0];
+}
+
+/** The provider's models, best default first (see [suggestModel]). */
+export function rankModels(provider: ProviderId, models: ModelInfo[]): ModelInfo[] {
   const prefs: Record<ProviderId, RegExp[]> = {
     gemini: [/^gemini-[\d.]+-flash$/, /flash(?!.*(lite|8b|preview|exp))/, /flash/, /gemini/],
     groq: [/gpt-oss-120b/, /llama.*70b/, /llama-4/, /./],
@@ -218,18 +223,49 @@ export function suggestModel(provider: ProviderId, models: ModelInfo[]): ModelIn
     custom: [/./],
   };
   const pool = provider === 'openrouter' ? models.filter((m) => m.free) : models;
+  const ranked = new Set<ModelInfo>();
+  const newestFirst = (list: ModelInfo[]) => list.sort((a, b) => b.id.localeCompare(a.id));
   for (const re of prefs[provider]) {
     const hits = pool.filter(
       (m) => re.test(m.id) && m.capabilities.smart && !/code|coder|preview/.test(m.id),
     );
-    const rec = hits.filter((m) => m.status === 'recommended');
-    if (rec.length) return rec.sort((a, b) => b.id.localeCompare(a.id))[0];
-    if (hits.length) return hits.sort((a, b) => b.id.localeCompare(a.id))[0];
+    for (const m of newestFirst(hits.filter((m) => m.status === 'recommended'))) ranked.add(m);
+    for (const m of newestFirst(hits)) ranked.add(m);
   }
-  return pool[0];
+  for (const m of pool) ranked.add(m);
+  return [...ranked];
 }
 
 export { providerInfo };
+
+/**
+ * The best-ranked model that answers right now. The newest model is often the
+ * busiest on free tiers (it can queue a tiny request for over a minute), so the
+ * top few candidates are checked at once and the first that works is suggested.
+ * Falls back to [suggestModel] when none answers.
+ */
+export async function suggestWorkingModel(
+  c: Credentials,
+  models: ModelInfo[],
+  opts: { fetchImpl?: typeof fetch; candidates?: number; timeoutMs?: number } = {},
+): Promise<ModelInfo | undefined> {
+  const ranked = rankModels(c.provider, models);
+  const checks = ranked.slice(0, opts.candidates ?? 3).map((m) =>
+    testModel(c, m.id, {
+      timeoutMs: opts.timeoutMs ?? 10_000,
+      ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}),
+    }).then(
+      () => m,
+      () => undefined,
+    ),
+  );
+  // In rank order: a better model that answers wins over a faster worse one.
+  for (const check of checks) {
+    const m = await check;
+    if (m) return m;
+  }
+  return ranked[0];
+}
 
 /**
  * Sends one tiny JSON request, so a model that can't be used (not in the free tier,

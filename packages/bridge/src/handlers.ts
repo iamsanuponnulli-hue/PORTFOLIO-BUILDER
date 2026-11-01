@@ -12,7 +12,7 @@ import {
   providerInfo,
   rewriteItems,
   suggestTaglines,
-  suggestModel,
+  suggestWorkingModel,
   testModel,
   writeCaseStudy,
   type CaseStudyInput,
@@ -252,7 +252,7 @@ export const workerHandlers = {
   // AI, with the user's own key
   listModels: async (c: Credentials) => {
     const models = await listModels(c);
-    return { models, suggested: suggestModel(c.provider, models)?.id };
+    return { models, suggested: (await suggestWorkingModel(c, models))?.id };
   },
   testModel: (c: Credentials, modelId: string) => testModel(c, modelId),
   parseResume: async (c: Credentials, modelId: string, text: string) => {

@@ -7,6 +7,7 @@ import {
   listModels,
   openRouterAuthUrl,
   suggestModel,
+  suggestWorkingModel,
 } from '../src/index.ts';
 
 function fakeFetch(routes: Record<string, { status?: number; body: unknown }>) {
@@ -126,6 +127,54 @@ describe('model suggestions and capabilities', () => {
     expect(capabilitiesFor('openai', 'gpt-4o-mini').smart).toBe(false);
     expect(capabilitiesFor('groq', 'llama-3.1-8b-instant').smart).toBe(false);
     expect(capabilitiesFor('groq', 'llama-3.3-70b-versatile').smart).toBe(true);
+  });
+});
+
+describe('a suggestion that answers', () => {
+  const g = (id: string) => ({
+    id,
+    label: id,
+    free: true,
+    capabilities: capabilitiesFor('gemini', id),
+    status: modelStatus('gemini', id),
+  });
+  const models = ['gemini-3.5-flash', 'gemini-3.8-flash', 'gemini-3.7-flash'].map(g);
+  const ok = () =>
+    new Response(
+      JSON.stringify({
+        candidates: [{ content: { role: 'model', parts: [{ text: '{"ok":true}' }] } }],
+        usageMetadata: {},
+      }),
+      { headers: { 'content-type': 'application/json' } },
+    );
+  /** The newest models queue the request (as Gemini's free tier does when busy). */
+  const busy = (slow: string[]) =>
+    (async (url: string, init?: RequestInit) => {
+      if (slow.some((id) => url.includes(`/${id}:`)))
+        return new Promise((_, reject) =>
+          init?.signal?.addEventListener('abort', () => reject(init.signal!.reason)),
+        );
+      return ok();
+    }) as unknown as typeof fetch;
+
+  it("skips the best-ranked models when they don't answer", async () => {
+    expect(suggestModel('gemini', models)!.id).toBe('gemini-3.8-flash');
+    const m = await suggestWorkingModel({ provider: 'gemini', apiKey: 'k' }, models, {
+      fetchImpl: busy(['gemini-3.8-flash', 'gemini-3.7-flash']),
+      timeoutMs: 100,
+    });
+    expect(m!.id).toBe('gemini-3.5-flash');
+  });
+
+  it('keeps the best-ranked model when it answers, and falls back when none does', async () => {
+    const c = { provider: 'gemini' as const, apiKey: 'k' };
+    expect((await suggestWorkingModel(c, models, { fetchImpl: busy([]) }))!.id).toBe(
+      'gemini-3.8-flash',
+    );
+    const none = busy(models.map((m) => m.id));
+    expect((await suggestWorkingModel(c, models, { fetchImpl: none, timeoutMs: 50 }))!.id).toBe(
+      'gemini-3.8-flash',
+    );
   });
 });
 
