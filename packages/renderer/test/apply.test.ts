@@ -31,6 +31,29 @@ describe('apply', () => {
     );
   });
 
+  it('refuses content edits that break the content shape', () => {
+    const wrongType = { op: 'updateContent', path: 'projects.p2.tech', value: 'React, Node' };
+    expect(() => apply(base(), wrongType as never)).toThrow(OperationError);
+    const tooLong = { op: 'updateContent', path: 'profile.name', value: 'x'.repeat(500) };
+    expect(() => apply(base(), tooLong as never)).toThrow(OperationError);
+    const noId = { op: 'addItem', path: 'projects', item: { title: 'No id' } };
+    expect(() => apply(base(), noId as never)).toThrow(OperationError);
+  });
+
+  it('fills defaults for added items and drops unknown fields', () => {
+    let s = apply(base(), { op: 'addItem', path: 'projects', item: { id: 'p9', title: 'New' } });
+    expect(s.content.projects.at(-1)!.tech).toEqual([]);
+    s = apply(s, { op: 'updateContent', path: 'profile.madeUp', value: 1 });
+    expect('madeUp' in s.content.profile).toBe(false);
+  });
+
+  it("doesn't block edits because of problems the content already had", () => {
+    const s = base();
+    s.content.profile.bio = 'x'.repeat(5000);
+    const next = apply(s, { op: 'updateContent', path: 'profile.name', value: 'Ada' });
+    expect(next.content.profile.name).toBe('Ada');
+  });
+
   it('merges theme changes, including one colour', () => {
     const s = apply(base(), {
       op: 'updateTheme',

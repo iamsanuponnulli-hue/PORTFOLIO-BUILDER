@@ -1,4 +1,4 @@
-import type { Operation, SectionType, SiteSpec } from '@pb/schema';
+import { PortfolioContent, type Operation, type SectionType, type SiteSpec } from '@pb/schema';
 import { hasVariant, NAV_VARIANTS, SECTION_CATALOG } from './catalog.ts';
 import { getAt, setAt } from './paths.ts';
 import type { SiteState } from './types.ts';
@@ -28,19 +28,47 @@ function newSectionId(state: SiteState, type: SectionType): string {
 
 const clampIndex = (i: number, len: number) => Math.max(0, Math.min(i, len));
 
+const issueKey = (i: { path: PropertyKey[]; message: string }) =>
+  `${i.path.map(String).join('.')}|${i.message}`;
+
+/**
+ * Content edits carry any value, so the result is checked against the schema: a
+ * wrong shape (e.g. a string where a list belongs) or an over-long text fails here
+ * instead of breaking the app that reads it. Problems the content already had
+ * don't block the edit. Returns the parsed content (unknown fields dropped).
+ */
+function checkedContent(before: SiteState['content'], next: unknown, path: string) {
+  const r = PortfolioContent.safeParse(next);
+  if (r.success) return r.data;
+  const old = PortfolioContent.safeParse(before);
+  const known = new Set(old.success ? [] : old.error.issues.map(issueKey));
+  const issue = r.error.issues.find((i) => !known.has(issueKey(i)));
+  if (!issue) return next as SiteState['content'];
+  const at = issue.path.map(String).join('.');
+  return fail(`"${path}" can't be changed that way (${at ? `${at}: ` : ''}${issue.message})`);
+}
+
 /**
  * Applies one operation and returns the new state. Pure: the input is never mutated.
  * Throws OperationError for operations that don't fit the current state.
  */
 export function apply(state: SiteState, op: Operation): SiteState {
   switch (op.op) {
-    case 'updateContent':
-      return { ...state, content: setAt(state.content, op.path, op.value) };
+    case 'updateContent': {
+      let next: unknown;
+      try {
+        next = setAt(state.content, op.path, op.value);
+      } catch (e) {
+        return fail((e as Error).message);
+      }
+      return { ...state, content: checkedContent(state.content, next, op.path) };
+    }
 
     case 'addItem': {
       const arr = getAt(state.content, op.path);
       if (!Array.isArray(arr)) fail(`"${op.path}" is not a list`);
-      return { ...state, content: setAt(state.content, op.path, [...(arr as unknown[]), op.item]) };
+      const next = setAt(state.content, op.path, [...(arr as unknown[]), op.item]);
+      return { ...state, content: checkedContent(state.content, next, op.path) };
     }
 
     case 'removeItem': {

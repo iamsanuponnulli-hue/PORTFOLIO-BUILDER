@@ -162,7 +162,19 @@ class AssistantPanelState extends ConsumerState<AssistantPanel> {
   Future<void> _accept(_Turn turn) async {
     final p = editor.proposal;
     if (p == null) return;
-    await editor.acceptProposal(skipContent: _skip);
+    try {
+      await editor.acceptProposal(skipContent: _skip);
+    } catch (e) {
+      if (mounted) {
+        showAiError(
+          context,
+          e is PbException
+              ? e
+              : PbException('error', "This change couldn't be applied: $e"),
+        );
+      }
+      return;
+    }
     turn.status = _Status.accepted;
     setState(() {});
     try {

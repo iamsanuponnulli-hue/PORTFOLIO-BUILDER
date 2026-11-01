@@ -311,7 +311,8 @@ class EditorController extends ChangeNotifier {
   }
 
   /// Applies the proposal to the current site, leaving out content changes the
-  /// person unticked. Returns the operations applied.
+  /// person unticked. Returns the operations applied. If applying fails, the
+  /// proposal stays so the person can try again or reject it.
   Future<List<Map<String, dynamic>>> acceptProposal({
     Set<int> skipContent = const {},
   }) async {
@@ -321,8 +322,9 @@ class EditorController extends ChangeNotifier {
       for (final (i, op) in p.operations.indexed)
         if (!skipContent.contains(i)) op,
     ];
-    proposal = null;
     await apply(ops);
+    proposal = null;
+    scheduleRender(immediate: true);
     notifyListeners();
     return ops;
   }
