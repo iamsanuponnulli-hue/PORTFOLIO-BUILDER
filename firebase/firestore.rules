@@ -20,23 +20,43 @@ service cloud.firestore {
     }
 
     // ---- users/{uid} -------------------------------------------------------
-    // projectCount moves by exactly one, in the same batch as a project create/delete.
+    // projectCount moves by exactly one, in the same batch as the create or delete of
+    // the project named in lastProjectId, so the counter can't be moved on its own.
+    function userFields() {
+      return ['displayName', 'email', 'ai', 'projectCount', 'createdAt', 'lastProjectId'];
+    }
+    function countedProject() {
+      let id = request.resource.data.get('lastProjectId', '');
+      return /databases/$(database)/documents/projects/$(id is string && id.size() > 0 ? id : '-');
+    }
+    function projectAppears(uid) {
+      return !exists(countedProject()) && existsAfter(countedProject())
+        && getAfter(countedProject()).data.ownerId == uid;
+    }
+    function projectGoes(uid) {
+      return exists(countedProject()) && !existsAfter(countedProject())
+        && get(countedProject()).data.ownerId == uid;
+    }
+
     match /users/{uid} {
       allow read: if isUser(uid);
       allow create: if isUser(uid)
-        && request.resource.data.keys().hasOnly(['displayName', 'email', 'ai', 'projectCount', 'createdAt'])
+        && request.resource.data.keys().hasOnly(userFields())
         && request.resource.data.projectCount == 0;
       allow update: if isUser(uid)
-        && request.resource.data.keys().hasOnly(['displayName', 'email', 'ai', 'projectCount', 'createdAt'])
+        && request.resource.data.keys().hasOnly(userFields())
         && request.resource.data.createdAt == resource.data.createdAt
         && request.resource.data.projectCount is int
         && request.resource.data.projectCount >= 0
         && request.resource.data.projectCount <= 5
         && (request.resource.data.projectCount == resource.data.projectCount
-            || request.resource.data.projectCount == resource.data.projectCount + 1
-            || request.resource.data.projectCount == resource.data.projectCount - 1);
+            || (request.resource.data.projectCount == resource.data.projectCount + 1
+                && projectAppears(uid))
+            || (request.resource.data.projectCount == resource.data.projectCount - 1
+                && projectGoes(uid)));
       // The app deletes the user's projects first, then this document, then the account.
-      allow delete: if isUser(uid);
+      // Only once no projects are left, so the counter can't restart from zero.
+      allow delete: if isUser(uid) && resource.data.projectCount == 0;
     }
 
     // ---- projects/{pid} ----------------------------------------------------
@@ -63,7 +83,8 @@ service cloud.firestore {
         && validProject(request.resource.data)
         && request.resource.data.revision == 0
         && userAfter().projectCount == userBefore().projectCount + 1
-        && userAfter().projectCount <= 5;
+        && userAfter().projectCount <= 5
+        && userAfter().get('lastProjectId', '') == pid;
 
       // revision must advance by one: a stale tab can't overwrite newer changes.
       allow update: if signedIn() && verified()
@@ -74,7 +95,8 @@ service cloud.firestore {
 
       allow delete: if signedIn()
         && resource.data.ownerId == request.auth.uid
-        && userAfter().projectCount == userBefore().projectCount - 1;
+        && userAfter().projectCount == userBefore().projectCount - 1
+        && userAfter().get('lastProjectId', '') == pid;
 
       function ownsParent() {
         return signedIn()
@@ -82,10 +104,12 @@ service cloud.firestore {
       }
 
       // Versions are immutable snapshots; the snapshot is one JSON string (≤ 900 KB).
-      // The app keeps the 30 newest (keep in sync with LIMITS.maxVersionsPerProject).
+      // They live in 30 slots, v0–v29, so history can't grow without bound: the app
+      // deletes the oldest to reuse its slot (keep in sync with LIMITS.maxVersionsPerProject).
       match /versions/{vid} {
         allow read: if ownsParent();
         allow create: if ownsParent() && verified()
+          && vid.matches('v([0-9]|[12][0-9])')
           && request.resource.data.keys().hasOnly(['source', 'createdAt', 'summary', 'prompt', 'snapshot'])
           && request.resource.data.source in ['generate', 'manual', 'assistant', 'regenerate', 'import', 'restore']
           && request.resource.data.createdAt is int

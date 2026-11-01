@@ -51,7 +51,7 @@ async function seed(data: Record<string, object>) {
 async function createProject(db: ReturnType<typeof alice>, id: string, count: number) {
   const b = writeBatch(db);
   b.set(doc(db, `projects/${id}`), project());
-  b.update(doc(db, 'users/alice'), { projectCount: count + 1 });
+  b.update(doc(db, 'users/alice'), { projectCount: count + 1, lastProjectId: id });
   return b.commit();
 }
 
@@ -72,9 +72,26 @@ describe('users', () => {
     await assertFails(deleteDoc(doc(alice(), 'users/bob')));
     await assertSucceeds(deleteDoc(doc(alice(), 'users/alice')));
   });
+  it('keeps the doc while projects remain, so the counter cannot restart at zero', async () => {
+    await seed({ 'users/alice': userDoc(1), 'projects/p1': project() });
+    await assertFails(deleteDoc(doc(alice(), 'users/alice')));
+  });
   it('blocks setting projectCount out of range', async () => {
     await seed({ 'users/alice': userDoc() });
     await assertFails(updateDoc(doc(alice(), 'users/alice'), { projectCount: 3 }));
+  });
+  it('blocks moving projectCount without creating or deleting a project', async () => {
+    await seed({ 'users/alice': userDoc(1), 'projects/p1': project() });
+    await assertFails(updateDoc(doc(alice(), 'users/alice'), { projectCount: 0 }));
+    await assertFails(
+      updateDoc(doc(alice(), 'users/alice'), { projectCount: 0, lastProjectId: 'p1' }),
+    );
+    await assertFails(
+      updateDoc(doc(alice(), 'users/alice'), { projectCount: 2, lastProjectId: 'p1' }),
+    );
+    await assertFails(
+      updateDoc(doc(alice(), 'users/alice'), { projectCount: 2, lastProjectId: 'nope' }),
+    );
   });
 });
 
@@ -87,6 +104,14 @@ describe('projects', () => {
   it('rejects a project created without updating the counter', async () => {
     await assertFails(setDoc(doc(alice(), 'projects/p1'), project()));
   });
+  it('rejects two projects created with one counter step', async () => {
+    const db = alice();
+    const b = writeBatch(db);
+    b.set(doc(db, 'projects/p1'), project());
+    b.set(doc(db, 'projects/p2'), project());
+    b.update(doc(db, 'users/alice'), { projectCount: 1, lastProjectId: 'p1' });
+    await assertFails(b.commit());
+  });
   it('rejects a 6th project', async () => {
     await seed({ 'users/alice': userDoc(5) });
     await assertFails(createProject(alice(), 'p6', 5));
@@ -95,7 +120,7 @@ describe('projects', () => {
     const db = alice();
     const b = writeBatch(db);
     b.set(doc(db, 'projects/p1'), project('bob'));
-    b.update(doc(db, 'users/alice'), { projectCount: 1 });
+    b.update(doc(db, 'users/alice'), { projectCount: 1, lastProjectId: 'p1' });
     await assertFails(b.commit());
   });
   it('requires a verified email for email/password users', async () => {
@@ -132,8 +157,17 @@ describe('projects', () => {
       const db = alice();
       const b = writeBatch(db);
       b.delete(doc(db, 'projects/p1'));
-      b.update(doc(db, 'users/alice'), { projectCount: 0 });
+      b.update(doc(db, 'users/alice'), { projectCount: 0, lastProjectId: 'p1' });
       await assertSucceeds(b.commit());
+    });
+    it('rejects a delete whose counter step names another project', async () => {
+      await seed({ 'users/alice': userDoc(2), 'projects/p2': project() });
+      const db = alice();
+      const b = writeBatch(db);
+      b.delete(doc(db, 'projects/p1'));
+      b.delete(doc(db, 'projects/p2'));
+      b.update(doc(db, 'users/alice'), { projectCount: 1, lastProjectId: 'p1' });
+      await assertFails(b.commit());
     });
     it('rejects a delete that leaves the counter unchanged', async () => {
       await assertFails(deleteDoc(doc(alice(), 'projects/p1')));
@@ -156,6 +190,13 @@ describe('projects', () => {
       await assertFails(setDoc(doc(bob(), 'projects/p1/versions/v6'), v));
       await assertFails(updateDoc(doc(alice(), 'projects/p1/versions/v1'), { summary: 'x' }));
       await assertFails(getDoc(doc(bob(), 'projects/p1/versions/v1')));
+    });
+    it('keeps versions to the 30 slots v0–v29', async () => {
+      const v = { source: 'manual', createdAt: 2, summary: 'Saved', snapshot: '{}' };
+      await assertSucceeds(setDoc(doc(alice(), 'projects/p1/versions/v0'), v));
+      await assertSucceeds(setDoc(doc(alice(), 'projects/p1/versions/v29'), v));
+      await assertFails(setDoc(doc(alice(), 'projects/p1/versions/v30'), v));
+      await assertFails(setDoc(doc(alice(), 'projects/p1/versions/aB3xYz'), v));
     });
   });
 });

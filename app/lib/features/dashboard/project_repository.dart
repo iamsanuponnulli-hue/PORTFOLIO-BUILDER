@@ -54,7 +54,8 @@ class ProjectLimitReached implements Exception {
 
 /// Projects and the per-user counter that enforces the project limit.
 /// Every write goes through a transaction so the counter and projects stay in step
-/// (security rules reject any create/delete that doesn't move the counter by one).
+/// (security rules reject any create/delete that doesn't move the counter by one
+/// and name the project in lastProjectId).
 class ProjectRepository {
   ProjectRepository(
     this._db,
@@ -215,7 +216,10 @@ class ProjectRepository {
       final user = await tx.get(_user(uid));
       final count = (user.data()?['projectCount'] as num?)?.toInt() ?? 0;
       tx.delete(ref);
-      tx.update(_user(uid), {'projectCount': count > 0 ? count - 1 : 0});
+      tx.update(_user(uid), {
+        'projectCount': count > 0 ? count - 1 : 0,
+        'lastProjectId': ref.id,
+      });
     });
   }
 
@@ -226,7 +230,10 @@ class ProjectRepository {
       final count = (user.data()?['projectCount'] as num?)?.toInt() ?? 0;
       if (count >= maxProjects) throw ProjectLimitReached(maxProjects);
       tx.set(ref, data);
-      tx.update(_user(uid), {'projectCount': count + 1});
+      tx.update(_user(uid), {
+        'projectCount': count + 1,
+        'lastProjectId': ref.id,
+      });
     });
     return ref.id;
   }

@@ -26,6 +26,8 @@ export const UserDoc = z
     email: z.string().max(254).default(''),
     ai: AiSettings.default(AiSettings.parse({})),
     projectCount: z.number().int().min(0).default(0),
+    /** The project created or deleted with the last counter change (checked by the rules). */
+    lastProjectId: z.string().max(128).nullish(),
     createdAt: z.number().int(),
   })
   .meta({ id: 'UserDoc' });

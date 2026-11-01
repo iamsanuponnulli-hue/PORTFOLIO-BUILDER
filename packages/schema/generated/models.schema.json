@@ -1358,6 +1358,17 @@
           "minimum": 0,
           "maximum": 9007199254740991
         },
+        "lastProjectId": {
+          "anyOf": [
+            {
+              "type": "string",
+              "maxLength": 128
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
         "createdAt": {
           "type": "integer",
           "minimum": -9007199254740991,

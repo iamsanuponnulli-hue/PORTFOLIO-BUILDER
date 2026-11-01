@@ -215,6 +215,8 @@ void main() {
       }
       final list = await versions.list('p1');
       expect(list.map((v) => v.doc.summary), ['v4', 'v3', 'v2']);
+      // Only the slot ids the security rules allow are used.
+      expect(list.map((v) => v.id).toSet(), {'v0', 'v1', 'v2'});
       final restored = restoreSnapshot(doc, list.last.doc);
       expect(restored.content.profile.name, 'v2');
       expect(restored.name, doc.name);

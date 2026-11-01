@@ -1615,6 +1615,7 @@ class UserDoc {
     final int createdAt;
     final String displayName;
     final String email;
+    final String? lastProjectId;
     final int projectCount;
 
     UserDoc({
@@ -1622,6 +1623,7 @@ class UserDoc {
         required this.createdAt,
         required this.displayName,
         required this.email,
+        this.lastProjectId,
         required this.projectCount,
     });
 
@@ -1630,6 +1632,7 @@ class UserDoc {
         int? createdAt,
         String? displayName,
         String? email,
+        String? lastProjectId,
         int? projectCount,
     }) => 
         UserDoc(
@@ -1637,6 +1640,7 @@ class UserDoc {
             createdAt: createdAt ?? this.createdAt,
             displayName: displayName ?? this.displayName,
             email: email ?? this.email,
+            lastProjectId: lastProjectId ?? this.lastProjectId,
             projectCount: projectCount ?? this.projectCount,
         );
 
@@ -1645,6 +1649,7 @@ class UserDoc {
         createdAt: json["createdAt"],
         displayName: json["displayName"],
         email: json["email"],
+        lastProjectId: json["lastProjectId"],
         projectCount: json["projectCount"],
     );
 
@@ -1653,6 +1658,7 @@ class UserDoc {
         "createdAt": createdAt,
         "displayName": displayName,
         "email": email,
+        "lastProjectId": lastProjectId,
         "projectCount": projectCount,
     };
 }
